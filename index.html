@@ -619,9 +619,17 @@
         function allowDrop(ev) { ev.preventDefault(); ev.currentTarget.classList.add('drag-over'); }
         function leaveDrop(ev) { ev.currentTarget.classList.remove('drag-over'); }
         function drop(ev, destinoSemIndex) {
-            ev.preventDefault(); ev.currentTarget.classList.remove('drag-over');
+            ev.preventDefault(); ev.currentTarget.classList.add('drag-over');
             let data = JSON.parse(ev.dataTransfer.getData("text/plain"));
-            let itemMovido = data.origemTipo === 'gaveta' ? dadosApp[mesAtual].gaveta.splice(data.itemIndex, 1)[0] : dadosApp[mesAtual].semanas[data.origemIndex].itens.splice(data.itemIndex, 1)[0];
+            
+            let itemMovido;
+            if (data.origemTipo === 'gaveta') {
+                // Remove definitivamente da gaveta quando arrastado para a semana
+                itemMovido = dadosApp[mesAtual].gaveta.splice(data.itemIndex, 1)[0];
+            } else {
+                itemMovido = dadosApp[mesAtual].semanas[data.origemIndex].itens.splice(data.itemIndex, 1)[0];
+            }
+            
             dadosApp[mesAtual].semanas[destinoSemIndex].itens.push(itemMovido);
             salvarTudo();
         }
