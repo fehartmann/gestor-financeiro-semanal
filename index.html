@@ -30,11 +30,11 @@
             <form onsubmit="realizarAutenticacao(event)" class="space-y-4">
                 <div>
                     <label class="text-xs font-semibold text-slate-600 block mb-1">E-mail</label>
-                    <input type="email" id="authEmail" required class="w-full border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:border-indigo-600" placeholder="seu@email.com">
+                    <input type="email" id="authEmail" autocomplete="email" required class="w-full border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:border-indigo-600" placeholder="seu@email.com">
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-slate-600 block mb-1">Senha</label>
-                    <input type="password" id="authSenha" required class="w-full border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:border-indigo-600" placeholder="••••••••">
+                    <input type="password" id="authSenha" autocomplete="current-password" required class="w-full border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:border-indigo-600" placeholder="••••••••">
                 </div>
                 <button type="submit" id="btnSubmitAuth" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-lg shadow-indigo-200">
                     Entrar no Sistema
@@ -242,7 +242,7 @@
     <div id="modalEditarMes" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 class="font-bold text-slate-800 text-lg">Renomear Mês Atual</h3>
-            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Nome de Exibição</label><input type="text" id="inputEditarMesNome" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Setembro 2026"></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Nome de Exibição</label><input type="text" id="inputEditarMesNome" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Setembro 2026"></div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalEditarMes()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarEditarMes()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
         </div>
     </div>
@@ -261,8 +261,8 @@
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 class="font-bold text-slate-800 text-lg" id="tituloModalTransacao">Adicionar Conta / Transação</h3>
             <input type="hidden" id="transacaoSemanaIdx"><input type="hidden" id="transacaoItemIdx">
-            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Nome / Descrição</label><input type="text" id="transacaoDesc" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none"></div>
-            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Valor (R$)</label><input type="number" step="0.01" id="transacaoValor" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none"></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Nome / Descrição</label><input type="text" id="transacaoDesc" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none"></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Valor (R$)</label><input type="number" step="0.01" id="transacaoValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none"></div>
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Tipo</label>
                 <select id="transacaoTipo" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none" onchange="verificarTipoTransacao(this.value)">
                     <option value="saida">Saída / Conta</option><option value="entra">Entrada</option><option value="aplicacao">Aplicação (Reserva+)</option><option value="resgate">Resgate (Reserva-)</option>
@@ -282,10 +282,10 @@
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 class="font-bold text-slate-800 text-lg" id="tituloModalGastoCartao">Adicionar Gasto Cartão</h3>
             <input type="hidden" id="cartaoAlvo"><input type="hidden" id="gastoCartaoIdx">
-            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Descrição</label><input type="text" id="gastoDesc" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Descrição</label><input type="text" id="gastoDesc" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
             <div class="grid grid-cols-2 gap-2">
-                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Orçado</label><input type="number" step="0.01" id="gastoOrcado" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
-                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Real</label><input type="number" step="0.01" id="gastoReal" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Orçado</label><input type="number" step="0.01" id="gastoOrcado" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Real</label><input type="number" step="0.01" id="gastoReal" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
             </div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalGastoCartao()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarGastoCartao()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
         </div>
@@ -295,7 +295,7 @@
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 class="font-bold text-slate-800 text-lg">Criar Novo Mês</h3>
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Mês e Ano</label><input type="month" id="inputMesAno" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
-            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Nome Exibição</label><input type="text" id="inputMesNome" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Setembro 2026"></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Nome Exibição</label><input type="text" id="inputMesNome" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Setembro 2026"></div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalNovoMes()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="criarNovoMes()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Criar</button></div>
         </div>
     </div>
@@ -303,7 +303,7 @@
     <div id="modalSemanaExtra" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 class="font-bold text-slate-800 text-lg">Semana Extra</h3>
-            <input type="text" id="inputPeriodoExtra" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="23 a 31">
+            <input type="text" id="inputPeriodoExtra" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="23 a 31">
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalSemanaExtra()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="confirmarSemanaExtra()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Adicionar</button></div>
         </div>
     </div>
@@ -311,8 +311,8 @@
     <div id="modalParcelado" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 class="font-bold text-slate-800 text-lg">Nova Parcela / Conta</h3>
-            <input type="text" id="parcDesc" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Descrição">
-            <input type="number" step="0.01" id="parcValor" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
+            <input type="text" id="parcDesc" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Descrição">
+            <input type="number" step="0.01" id="parcValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Destino</label><select id="parcDestino" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></select></div>
             <div class="grid grid-cols-2 gap-2"><input type="month" id="parcInicio" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><input type="month" id="parcFim" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalParcelado()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarParcelado()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
@@ -322,9 +322,9 @@
     <div id="modalNovoQuadroReserva" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 class="font-bold text-slate-800 text-lg">Novo Quadro de Reserva</h3>
-            <input type="text" id="novoQuadroNome" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Nome">
-            <input type="number" step="0.01" id="novoQuadroMeta" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Meta">
-            <input type="number" step="0.01" id="novoQuadroSaldo" class="w-full border border-slate-300 rounded-lg p-2 text-sm" value="0.00">
+            <input type="text" id="novoQuadroNome" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Nome">
+            <input type="number" step="0.01" id="novoQuadroMeta" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Meta">
+            <input type="number" step="0.01" id="novoQuadroSaldo" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" value="0.00">
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalNovoQuadroReserva()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarNovoQuadroReserva()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Criar</button></div>
         </div>
     </div>
@@ -333,8 +333,8 @@
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 class="font-bold text-slate-800 text-lg" id="tituloModalQuadroReserva">Movimentar Reserva</h3>
             <input type="hidden" id="idQuadroAlvo"><input type="hidden" id="tipoMovQuadro">
-            <input type="number" step="0.01" id="valorMovQuadro" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
-            <input type="text" id="descMovQuadro" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Motivo">
+            <input type="number" step="0.01" id="valorMovQuadro" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
+            <input type="text" id="descMovQuadro" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Motivo">
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalMovQuadroReserva()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="confirmarMovQuadroReserva()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Confirmar</button></div>
         </div>
     </div>
@@ -343,8 +343,8 @@
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 class="font-bold text-slate-800 text-lg">Configurar Fixo</h3>
             <input type="hidden" id="adminItemIdx">
-            <input type="text" id="adminItemDesc" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Descrição">
-            <input type="number" step="0.01" id="adminItemValor" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
+            <input type="text" id="adminItemDesc" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Descrição">
+            <input type="number" step="0.01" id="adminItemValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
             <select id="adminItemTipo" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="saida">Saída</option><option value="entra">Entrada</option></select>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalAdminItem()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarAdminItem()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
         </div>
@@ -354,8 +354,8 @@
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 class="font-bold text-slate-800 text-lg">Orçamento Categoria</h3>
             <input type="hidden" id="adminOrcIdx">
-            <input type="text" id="adminOrcDesc" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Categoria">
-            <input type="number" step="0.01" id="adminOrcValor" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
+            <input type="text" id="adminOrcDesc" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Categoria">
+            <input type="number" step="0.01" id="adminOrcValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
             <select id="adminOrcCartao" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></select>
             <div class="grid grid-cols-2 gap-2"><input type="month" id="adminOrcInicio" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><input type="month" id="adminOrcFim" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalAdminOrcamento()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarAdminOrcamento()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
@@ -366,8 +366,8 @@
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 class="font-bold text-slate-800 text-lg">Configurar Cartão</h3>
             <input type="hidden" id="adminCartaoIdx">
-            <input type="text" id="adminCartaoNome" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Nome">
-            <input type="number" step="0.01" id="adminCartaoLimite" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Limite">
+            <input type="text" id="adminCartaoNome" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Nome">
+            <input type="number" step="0.01" id="adminCartaoLimite" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Limite">
             <select id="adminCartaoSemanaTeto" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="0">Semana 1</option><option value="1">Semana 2</option><option value="2">Semana 3</option><option value="3">Semana 4</option></select>
             <select id="adminCartaoCor" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="rose">Rosa</option><option value="indigo">Azul</option><option value="emerald">Verde</option><option value="amber">Laranja</option></select>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalAdminCartao()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarAdminCartao()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
@@ -495,7 +495,9 @@
             for (let mKey in dadosApp) {
                 configCartoes.forEach(c => {
                     let chaveItens = `itens${c.nome}`;
-                    dadosApp[mKey][chaveItens] = gerarItensCartaoParaMes(mKey, c.nome);
+                    if(!dadosApp[mKey][chaveItens]) {
+                        dadosApp[mKey][chaveItens] = gerarItensCartaoParaMes(mKey, c.nome);
+                    }
                 });
                 dadosApp[mKey].gaveta = construirGavetaParaMes(mKey);
             }
@@ -740,7 +742,9 @@
 
         function abrirModalGastoCartao(cartao, itemIdx = null) {
             document.getElementById('cartaoAlvo').value = cartao; document.getElementById('gastoCartaoIdx').value = itemIdx !== null ? itemIdx : '';
-            let itens = dadosApp[mesAtual][`itens${cartao}`] || [];
+            let chaveItens = `itens${cartao}`;
+            if(!dadosApp[mesAtual][chaveItens]) dadosApp[mesAtual][chaveItens] = [];
+            let itens = dadosApp[mesAtual][chaveItens];
             if(itemIdx !== null) {
                 let item = itens[itemIdx];
                 document.getElementById('tituloModalGastoCartao').innerText = `Editar Gasto (${cartao})`;
@@ -905,7 +909,7 @@
             });
         }
         function abrirModalNovoQuadroReserva() { document.getElementById('modalNovoQuadroReserva').classList.remove('hidden'); document.getElementById('modalNovoQuadroReserva').classList.add('flex'); }
-        function fecharModalNovoQuadroReserva() { document.getElementById('modalNovoQuadroReserva').classList.remove('flex'); document.getElementById('modalNovoQuadroReserva').classList.add('hidden'); }
+        function fecharModalNovoQuadroReserva() { document.getElementById('modalNovoQuadroReserva').classList.remove('hidden'); document.getElementById('modalNovoQuadroReserva').classList.add('hidden'); }
         function salvarNovoQuadroReserva() {
             let nome = document.getElementById('novoQuadroNome').value; let meta = parseFloat(document.getElementById('novoQuadroMeta').value)||0; let saldo = parseFloat(document.getElementById('novoQuadroSaldo').value)||0;
             if(!nome) return; quadrosReservasApp.push({ id: 'res_'+Date.now(), nome, saldo, meta }); fecharModalNovoQuadroReserva(); salvarTudo();
