@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor Financeiro Pro - Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <!-- SDK do Supabase para Autenticação e Banco de Dados -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .kanban-drop-zone { min-height: 150px; transition: background-color 0.2s; }
+        .kanban-drop-zone.drag-over { background-color: #f1f5f9; border: 2px dashed #6366f1; border-radius: 0.5rem; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-full flex flex-col">
+
+    <!-- TELA DE AUTENTICAÇÃO (LOGIN / CADASTRO) -->
+    <div id="telaAuth" class="fixed inset-0 bg-indigo-950 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl max-w-md w-full p-8 space-y-6 shadow-2xl">
+            <div class="text-center space-y-2">
+                <div class="inline-flex p-3 bg-indigo-100 text-indigo-600 rounded-full text-2xl mb-1">
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900">Gestor Financeiro Pro</h2>
+                <p class="text-xs text-slate-500">Faça login para acessar suas finanças de qualquer lugar</p>
+            </div>
+
+            <div id="erroAuth" class="hidden bg-rose-50 border-l-4 border-rose-500 p-3 text-xs text-rose-700 rounded-r-lg"></div>
+
+            <form onsubmit="realizarAutenticacao(event)" class="space-y-4">
+                <div>
+                    <label class="text-xs font-semibold text-slate-600 block mb-1">E-mail</label>
+                    <input type="email" id="authEmail" required class="w-full border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:border-indigo-600" placeholder="seu@email.com">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-slate-600 block mb-1">Senha</label>
+                    <input type="password" id="authSenha" required class="w-full border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:border-indigo-600" placeholder="••••••••">
+                </div>
+                <button type="submit" id="btnSubmitAuth" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-lg shadow-indigo-200">
+                    Entrar no Sistema
+                </button>
+            </form>
+
+            <div class="text-center pt-2 border-t border-slate-100">
+                <button type="button" onclick="alternarModoAuth()" id="btnAlternarAuth" class="text-xs font-semibold text-indigo-600 hover:underline">
+                    Não tem uma conta? Crie uma agora
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SISTEMA FINANCEIRO (Oculto até fazer login) -->
+    <div id="sistemaApp" class="hidden h-full flex flex-col">
+        <!-- Header Principal -->
+        <header class="bg-indigo-900 text-white shadow-md">
+            <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+                <div>
+                    <h1 class="text-xl font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-wallet text-indigo-400"></i> Gestor Financeiro Pro
+                    </h1>
+                    <p class="text-xs text-indigo-200" id="infoUsuarioLogado">Sincronizado na Nuvem</p>
+                </div>
+                <div class="flex items-center gap-2 bg-indigo-800/80 px-3 py-1.5 rounded-lg border border-indigo-700 flex-wrap justify-end">
+                    <label for="mesSelect" class="text-xs font-medium text-indigo-200">Mês:</label>
+                    <select id="mesSelect" onchange="mudarMes(this.value)" class="bg-indigo-950 text-white text-sm font-semibold rounded px-2 py-1 focus:outline-none">
+                        <!-- JS preenche -->
+                    </select>
+                    <button onclick="abrirModalNovoMes()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-2 py-1 rounded font-semibold transition-colors">
+                        <i class="fa-solid fa-plus"></i> Novo Mês
+                    </button>
+                    <button onclick="fazerLogout()" class="bg-rose-600 hover:bg-rose-500 text-white text-xs px-2.5 py-1 rounded font-semibold transition-colors" title="Sair da Conta">
+                        <i class="fa-solid fa-right-from-bracket"></i> Sair
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navegação por Abas -->
+        <nav class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
+            <div class="max-w-7xl mx-auto flex overflow-x-auto no-scrollbar">
+                <button onclick="mudarAba('semanas')" id="btn-semanas" class="tab-btn flex-1 min-w-[100px] py-3 px-3 text-center text-xs sm:text-sm font-semibold border-b-2 border-indigo-600 text-indigo-600 flex items-center justify-center gap-1.5 transition-colors">
+                    <i class="fa-solid fa-calendar-week"></i> Kanban
+                </button>
+                <button onclick="mudarAba('cartoes')" id="btn-cartoes" class="tab-btn flex-1 min-w-[100px] py-3 px-3 text-center text-xs sm:text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1.5 transition-colors">
+                    <i class="fa-solid fa-credit-card"></i> Cartões & Tetos
+                </button>
+                <button onclick="mudarAba('parcelados')" id="btn-parcelados" class="tab-btn flex-1 min-w-[100px] py-3 px-3 text-center text-xs sm:text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1.5 transition-colors">
+                    <i class="fa-solid fa-receipt"></i> Parcelas
+                </button>
+                <button onclick="mudarAba('reserva')" id="btn-reserva" class="tab-btn flex-1 min-w-[100px] py-3 px-3 text-center text-xs sm:text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1.5 transition-colors">
+                    <i class="fa-solid fa-piggy-bank"></i> Reservas
+                </button>
+                <button onclick="mudarAba('admin')" id="btn-admin" class="tab-btn flex-1 min-w-[100px] py-3 px-3 text-center text-xs sm:text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1.5 transition-colors">
+                    <i class="fa-solid fa-gears"></i> Configurações
+                </button>
+            </div>
+        </nav>
+
+        <!-- Conteúdo Principal -->
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 overflow-y-auto space-y-6">
+
+            <!-- ABA 1: KANBAN -->
+            <section id="aba-semanas" class="space-y-6">
+                <div id="alertaMesContainer" class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg shadow-sm flex items-start gap-3">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-500 text-xl mt-0.5"></i>
+                    <div>
+                        <h3 class="font-semibold text-amber-800 text-sm" id="alertaTitulo">Planejamento do Mês</h3>
+                        <p class="text-xs text-amber-700 mt-0.5" id="alertaTexto">Organize os itens fixos da gaveta nas semanas correspondentes.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3 sm:gap-4">
+                    <div class="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <span class="text-xs text-slate-500 block font-medium">Entradas Totais</span>
+                        <span id="resumoEntradas" class="text-base sm:text-xl font-bold text-emerald-600 mt-1 block">R$ 0,00</span>
+                    </div>
+                    <div class="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <span class="text-xs text-slate-500 block font-medium">Saídas Totais</span>
+                        <span id="resumoSaidas" class="text-base sm:text-xl font-bold text-rose-600 mt-1 block">R$ 0,00</span>
+                    </div>
+                    <div class="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <span class="text-xs text-slate-500 block font-medium">Sobra do Mês</span>
+                        <span id="resumoSobra" class="text-base sm:text-xl font-bold text-indigo-600 mt-1 block">R$ 0,00</span>
+                    </div>
+                </div>
+
+                <div class="flex justify-end">
+                    <button onclick="abrirModalSemanaExtra()" class="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition-colors">
+                        <i class="fa-solid fa-calendar-plus"></i> + Adicionar Semana Extra
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                    <div class="bg-slate-100 rounded-xl border border-slate-300 shadow-sm overflow-hidden flex flex-col lg:col-span-1">
+                        <div class="bg-slate-200 p-3 border-b border-slate-300 flex justify-between items-center">
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-slate-600 tracking-wider">Base do Mês</span>
+                                <h4 class="text-xs font-bold text-slate-900">Gaveta de Fixos</h4>
+                            </div>
+                            <span class="text-[10px] bg-slate-300 text-slate-700 px-1.5 py-0.5 rounded font-semibold" id="contadorGaveta">0</span>
+                        </div>
+                        <div class="p-3 flex-1 flex flex-col justify-between kanban-drop-zone" ondragover="allowDrop(event)" ondragleave="leaveDrop(event)" ondrop="dropGaveta(event)">
+                            <ul id="listaGaveta" class="space-y-2 max-h-[500px] overflow-y-auto pr-1"></ul>
+                            <button onclick="abrirModalTransacao(-1)" class="mt-3 w-full py-1.5 border border-dashed border-slate-400 text-slate-600 hover:bg-slate-200 rounded-lg text-xs font-semibold flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-plus"></i> Novo Item na Gaveta
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="gridSemanas" class="lg:col-span-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4"></div>
+                </div>
+            </section>
+
+            <!-- ABA 2: CARTÕES & TETOS -->
+            <section id="aba-cartoes" class="hidden space-y-6">
+                <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-r-lg flex justify-between items-center flex-wrap gap-3">
+                    <div>
+                        <h3 class="font-semibold text-blue-900 text-sm">Controle de Cartões (<span id="lblMesCartoes">Mês Atual</span>)</h3>
+                        <p class="text-xs text-blue-800">Os gastos e categorias são gerados automaticamente pelas Configurações.</p>
+                    </div>
+                    <button onclick="abrirModalTabelaPlanilha()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5">
+                        <i class="fa-solid fa-table"></i> Visão Consolidada (Estilo Planilha)
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="gridCartoesDinamicos"></div>
+            </section>
+
+            <!-- ABA 3: PARCELAS -->
+            <section id="aba-parcelados" class="hidden space-y-6">
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-base">Faturas Parceladas e Contas</h3>
+                            <p class="text-xs text-slate-500">Cadastre compras em cartão ou boletos/contas com vigência por período.</p>
+                        </div>
+                        <button onclick="abrirModalParcelado()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-plus"></i> Nova Parcela / Conta
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-100 text-slate-600 uppercase">
+                                <tr>
+                                    <th class="p-2.5">Descrição</th>
+                                    <th class="p-2.5">Destino</th>
+                                    <th class="p-2.5">Valor</th>
+                                    <th class="p-2.5">Validade</th>
+                                    <th class="p-2.5 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaParcelados" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 4: RESERVAS MÚLTIPLAS -->
+            <section id="aba-reserva" class="hidden space-y-6">
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-5">
+                    <div class="flex justify-between items-center flex-wrap gap-3">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-base">Quadros de Reservas</h3>
+                            <p class="text-xs text-slate-500">Gerencie múltiplas reservas com metas e saldos personalizados.</p>
+                        </div>
+                        <button onclick="abrirModalNovoQuadroReserva()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-plus"></i> Criar Novo Quadro de Reserva
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="gridQuadrosReservas"></div>
+                </div>
+            </section>
+
+            <!-- ABA 5: CONFIGURAÇÕES -->
+            <section id="aba-admin" class="hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-slate-800 text-sm">Gaveta Fixos Padrão</h3>
+                            <button onclick="abrirModalAdminItem()" class="bg-indigo-600 text-white text-xs px-2 py-1 rounded font-semibold"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                        <div class="max-h-72 overflow-y-auto border border-slate-100 rounded-lg">
+                            <table class="w-full text-left text-xs"><tbody id="tabelaAdminFixos" class="divide-y divide-slate-100"></tbody></table>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-slate-800 text-sm">Orçamentos de Gastos Cartão</h3>
+                            <button onclick="abrirModalAdminOrcamento()" class="bg-indigo-600 text-white text-xs px-2 py-1 rounded font-semibold"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                        <div class="max-h-72 overflow-y-auto border border-slate-100 rounded-lg">
+                            <table class="w-full text-left text-xs"><tbody id="tabelaAdminOrcamentos" class="divide-y divide-slate-100"></tbody></table>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-slate-800 text-sm">Gerenciar Cartões</h3>
+                            <button onclick="abrirModalAdminCartao()" class="bg-indigo-600 text-white text-xs px-2 py-1 rounded font-semibold"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                        <div class="max-h-72 overflow-y-auto border border-slate-100 rounded-lg">
+                            <table class="w-full text-left text-xs"><tbody id="tabelaAdminCartoes" class="divide-y divide-slate-100"></tbody></table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAIS DO SISTEMA -->
+    <div id="modalTabelaPlanilha" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-5xl w-full p-6 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-slate-800 text-lg">Visão Consolidada por Cartão e Categoria</h3>
+                <button onclick="fecharModalTabelaPlanilha()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="conteudoPlanilhaConsolidada" class="space-y-6"></div>
+        </div>
+    </div>
+
+    <div id="modalTransacao" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 class="font-bold text-slate-800 text-lg" id="tituloModalTransacao">Adicionar Conta / Transação</h3>
+            <input type="hidden" id="transacaoSemanaIdx"><input type="hidden" id="transacaoItemIdx">
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Nome / Descrição</label><input type="text" id="transacaoDesc" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none"></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Valor (R$)</label><input type="number" step="0.01" id="transacaoValor" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none"></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Tipo</label>
+                <select id="transacaoTipo" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none" onchange="verificarTipoTransacao(this.value)">
+                    <option value="saida">Saída / Conta</option><option value="entra">Entrada</option><option value="aplicacao">Aplicação (Reserva+)</option><option value="resgate">Resgate (Reserva-)</option>
+                </select>
+            </div>
+            <div id="containerEscolhaReserva" class="hidden"><label class="text-xs font-semibold text-slate-600 block mb-1">Quadro de Reserva</label><select id="transacaoQuadroReserva" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></select></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Destino Inicial</label>
+                <select id="transacaoSemanaDestino" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
+                    <option value="-1">Gaveta de Fixos</option><option value="0">1ª Semana</option><option value="1">2ª Semana</option><option value="2">3ª Semana</option><option value="3">4ª Semana</option>
+                </select>
+            </div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalTransacao()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarTransacao()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
+        </div>
+    </div>
+
+    <div id="modalGastoCartao" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 class="font-bold text-slate-800 text-lg" id="tituloModalGastoCartao">Adicionar Gasto Cartão</h3>
+            <input type="hidden" id="cartaoAlvo"><input type="hidden" id="gastoCartaoIdx">
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Descrição</label><input type="text" id="gastoDesc" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Orçado</label><input type="number" step="0.01" id="gastoOrcado" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Real</label><input type="number" step="0.01" id="gastoReal" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalGastoCartao()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarGastoCartao()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
+        </div>
+    </div>
+
+    <div id="modalNovoMes" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 class="font-bold text-slate-800 text-lg">Criar Novo Mês</h3>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Mês e Ano</label><input type="month" id="inputMesAno" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Nome Exibição</label><input type="text" id="inputMesNome" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Setembro 2026"></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalNovoMes()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="criarNovoMes()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Criar</button></div>
+        </div>
+    </div>
+
+    <div id="modalSemanaExtra" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 class="font-bold text-slate-800 text-lg">Semana Extra</h3>
+            <input type="text" id="inputPeriodoExtra" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="23 a 31">
+            <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalSemanaExtra()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="confirmarSemanaExtra()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Adicionar</button></div>
+        </div>
+    </div>
+
+    <div id="modalParcelado" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 class="font-bold text-slate-800 text-lg">Nova Parcela / Conta</h3>
+            <input type="text" id="parcDesc" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Descrição">
+            <input type="number" step="0.01" id="parcValor" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Destino</label><select id="parcDestino" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></select></div>
+            <div class="grid grid-cols-2 gap-2"><input type="month" id="parcInicio" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><input type="month" id="parcFim" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalParcelado()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarParcelado()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
+        </div>
+    </div>
+
+    <div id="modalNovoQuadroReserva" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 class="font-bold text-slate-800 text-lg">Novo Quadro de Reserva</h3>
+            <input type="text" id="novoQuadroNome" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Nome">
+            <input type="number" step="0.01" id="novoQuadroMeta" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Meta">
+            <input type="number" step="0.01" id="novoQuadroSaldo" class="w-full border border-slate-300 rounded-lg p-2 text-sm" value="0.00">
+            <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalNovoQuadroReserva()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarNovoQuadroReserva()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Criar</button></div>
+        </div>
+    </div>
+
+    <div id="modalMovQuadroReserva" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 class="font-bold text-slate-800 text-lg" id="tituloModalQuadroReserva">Movimentar Reserva</h3>
+            <input type="hidden" id="idQuadroAlvo"><input type="hidden" id="tipoMovQuadro">
+            <input type="number" step="0.01" id="valorMovQuadro" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
+            <input type="text" id="descMovQuadro" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Motivo">
+            <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalMovQuadroReserva()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="confirmarMovQuadroReserva()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Confirmar</button></div>
+        </div>
+    </div>
+
+    <div id="modalAdminItem" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 class="font-bold text-slate-800 text-lg">Configurar Fixo</h3>
+            <input type="hidden" id="adminItemIdx">
+            <input type="text" id="adminItemDesc" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Descrição">
+            <input type="number" step="0.01" id="adminItemValor" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
+            <select id="adminItemTipo" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="saida">Saída</option><option value="entra">Entrada</option></select>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalAdminItem()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarAdminItem()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
+        </div>
+    </div>
+
+    <div id="modalAdminOrcamento" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 class="font-bold text-slate-800 text-lg">Orçamento Categoria</h3>
+            <input type="hidden" id="adminOrcIdx">
+            <input type="text" id="adminOrcDesc" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Categoria">
+            <input type="number" step="0.01" id="adminOrcValor" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
+            <select id="adminOrcCartao" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></select>
+            <div class="grid grid-cols-2 gap-2"><input type="month" id="adminOrcInicio" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><input type="month" id="adminOrcFim" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalAdminOrcamento()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarAdminOrcamento()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
+        </div>
+    </div>
+
+    <div id="modalAdminCartao" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 class="font-bold text-slate-800 text-lg">Configurar Cartão</h3>
+            <input type="hidden" id="adminCartaoIdx">
+            <input type="text" id="adminCartaoNome" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Nome">
+            <input type="number" step="0.01" id="adminCartaoLimite" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Limite">
+            <select id="adminCartaoSemanaTeto" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="0">Semana 1</option><option value="1">Semana 2</option><option value="2">Semana 3</option><option value="3">Semana 4</option></select>
+            <select id="adminCartaoCor" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="rose">Rosa</option><option value="indigo">Azul</option><option value="emerald">Verde</option><option value="amber">Laranja</option></select>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalAdminCartao()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarAdminCartao()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
+        </div>
+    </div>
+
+    <!-- SCRIPT DE CONEXÃO COM O SUPABASE E BANCO DE DADOS -->
+    <script>
+        // ======= SUAS CHAVES DO SUPABASE JÁ CONFIGURADAS AQUI =======
+        const SUPABASE_URL = 'https://chllqsczgfvzxnmokfdl.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_9ioEMoLWjD7BIjy-72SiHg_iAzJ57p3';
+        // ============================================================
+
+        let supabaseClient = null;
+        try {
+            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        } catch(e) {
+            console.error("Erro ao iniciar Supabase. Insira suas chaves corretas.");
+        }
+
+        let usuarioAtual = null;
+        let modoCadastro = false;
+
+        let configFixosPadrao = [];
+        let configOrcamentos = [];
+        let configCartoes = [];
+        let parceladosApp = [];
+        let quadrosReservasApp = [];
+        let dadosApp = {};
+        let mesAtual = '';
+
+        async function verificarSessao() {
+            if(!supabaseClient) return;
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if(session) {
+                usuarioAtual = session.user;
+                document.getElementById('infoUsuarioLogado').innerText = usuarioAtual.email;
+                document.getElementById('telaAuth').classList.add('hidden');
+                document.getElementById('sistemaApp').classList.remove('hidden');
+                await carregarDadosNuvem();
+            }
+        }
+        verificarSessao();
+
+        function alternarModoAuth() {
+            modoCadastro = !modoCadastro;
+            const btnSub = document.getElementById('btnSubmitAuth');
+            const btnAlt = document.getElementById('btnAlternarAuth');
+            if(modoCadastro) {
+                btnSub.innerText = 'Cadastrar Conta';
+                btnAlt.innerText = 'Já tem uma conta? Faça login';
+            } else {
+                btnSub.innerText = 'Entrar no Sistema';
+                btnAlt.innerText = 'Não tem uma conta? Crie uma agora';
+            }
+        }
+
+        async function realizarAutenticacao(e) {
+            e.preventDefault();
+            const email = document.getElementById('authEmail').value;
+            const senha = document.getElementById('authSenha').value;
+            const errDiv = document.getElementById('erroAuth');
+            errDiv.classList.add('hidden');
+
+            if(!supabaseClient) {
+                errDiv.innerText = 'Erro ao conectar com o Supabase.';
+                errDiv.classList.remove('hidden');
+                return;
+            }
+
+            if(modoCadastro) {
+                const { data, error } = await supabaseClient.auth.signUp({ email, password: senha });
+                if(error) { errDiv.innerText = error.message; errDiv.classList.remove('hidden'); return; }
+                alert('Conta criada com sucesso! Faça login.');
+                alternarModoAuth();
+            } else {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: senha });
+                if(error) { errDiv.innerText = error.message; errDiv.classList.remove('hidden'); return; }
+                usuarioAtual = data.user;
+                document.getElementById('telaAuth').classList.add('hidden');
+                document.getElementById('sistemaApp').classList.remove('hidden');
+                await carregarDadosNuvem();
+            }
+        }
+
+        async function fazerLogout() {
+            await supabaseClient.auth.signOut();
+            location.reload();
+        }
+
+        async function carregarDadosNuvem() {
+            const { data, error } = await supabaseClient
+                .from('dados_usuarios')
+                .select('dados')
+                .eq('user_id', usuarioAtual.id)
+                .single();
+
+            if(data && data.dados) {
+                let d = data.dados;
+                configFixosPadrao = d.fixos || [];
+                configOrcamentos = d.orc || [];
+                configCartoes = d.cartoes || [];
+                parceladosApp = d.parcelados || [];
+                quadrosReservasApp = d.reservas || [];
+                dadosApp = d.dadosApp || {};
+            } else {
+                configFixosPadrao = []; configOrcamentos = []; configCartoes = []; parceladosApp = []; quadrosReservasApp = []; dadosApp = {};
+            }
+
+            mesAtual = Object.keys(dadosApp)[0] || '';
+            if (!mesAtual) {
+                let dataHoje = new Date();
+                let ano = dataHoje.getFullYear();
+                let mes = String(dataHoje.getMonth() + 1).padStart(2, '0');
+                mesAtual = `${ano}-${mes}`;
+                let nomesMeses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+                let nomeEx = `${nomesMeses[dataHoje.getMonth()]} ${ano}`;
+                dadosApp[mesAtual] = {
+                    nomeExibicao: nomeEx,
+                    tituloAlerta: `${nomeEx}: Planejamento do Zero`,
+                    textoAlerta: "Cadastre seus cartões e itens fixos na aba Configurações.",
+                    gaveta: construirGavetaParaMes(mesAtual),
+                    semanas: [
+                        { periodo: "01 a 07", nome: "1ª Semana", itens: [] },
+                        { periodo: "08 a 15", nome: "2ª Semana", itens: [] },
+                        { periodo: "16 a 22", nome: "3ª Semana", itens: [] },
+                        { periodo: "23 a 30", nome: "4ª Semana", itens: [] }
+                    ]
+                };
+            }
+
+            atualizarSeletorMeses();
+            renderizarApp();
+            renderizarParcelados();
+            renderizarAdmin();
+            renderizarReservas();
+        }
+
+        async function salvarTudo() {
+            for (let mKey in dadosApp) {
+                configCartoes.forEach(c => {
+                    let chaveItens = `itens${c.nome}`;
+                    dadosApp[mKey][chaveItens] = gerarItensCartaoParaMes(mKey, c.nome);
+                });
+                dadosApp[mKey].gaveta = construirGavetaParaMes(mKey);
+            }
+
+            let pacoteDados = {
+                fixos: configFixosPadrao,
+                orc: configOrcamentos,
+                cartoes: configCartoes,
+                parcelados: parceladosApp,
+                reservas: quadrosReservasApp,
+                dadosApp: dadosApp
+            };
+
+            await supabaseClient
+                .from('dados_usuarios')
+                .upsert({ user_id: usuarioAtual.id, dados: pacoteDados, atualizado_em: new Date() }, { onConflict: 'user_id' });
+
+            atualizarSeletorMeses();
+            renderizarApp();
+            renderizarParcelados();
+            renderizarAdmin();
+            renderizarReservas();
+        }
+
+        function construirGavetaParaMes(mesId) {
+            let gaveta = JSON.parse(JSON.stringify(configFixosPadrao));
+            parceladosApp.forEach(p => {
+                let dest = (p.destino || '').toLowerCase();
+                if(dest.includes('gaveta') || dest.includes('boleto')) {
+                    if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
+                        gaveta.push({ desc: `[Conta] ${p.desc}`, valor: p.valor, tipo: 'saida', pago: false });
+                    }
+                }
+            });
+            return gaveta;
+        }
+
+        function gerarItensCartaoParaMes(mesId, cartaoNome) {
+            let itens = [];
+            let nomeCartaoBusca = cartaoNome.toLowerCase().replace('cartão', '').trim();
+            configOrcamentos.forEach(o => {
+                let cartaoOrc = (o.cartao || '').toLowerCase().replace('cartão', '').trim();
+                if (cartaoOrc === nomeCartaoBusca) {
+                    if ((!o.inicio || mesId >= o.inicio) && (!o.fim || mesId <= o.fim)) {
+                        itens.push({ id: Date.now() + Math.random(), desc: o.desc, orcado: o.valor, real: o.valor });
+                    }
+                }
+            });
+            parceladosApp.forEach(p => {
+                let dest = (p.destino || '').toLowerCase().replace('cartão', '').trim();
+                if (dest === nomeCartaoBusca) {
+                    if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
+                        itens.push({ id: Date.now() + Math.random(), desc: `[Parcela] ${p.desc}`, orcado: p.valor, real: p.valor });
+                    }
+                }
+            });
+            return itens;
+        }
+
+        function atualizarSeletorMeses() {
+            const select = document.getElementById('mesSelect');
+            select.innerHTML = '';
+            for (let key in dadosApp) {
+                let opt = document.createElement('option');
+                opt.value = key; opt.text = dadosApp[key].nomeExibicao || key;
+                if (key === mesAtual) opt.selected = true;
+                select.appendChild(opt);
+            }
+        }
+
+        function mudarMes(novoMes) { mesAtual = novoMes; renderizarApp(); }
+        function mudarAba(abaId) {
+            document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('border-indigo-600', 'text-indigo-600');
+                btn.classList.add('border-transparent', 'text-slate-500');
+            });
+            document.getElementById(`aba-${abaId}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`btn-${abaId}`);
+            activeBtn.classList.remove('border-transparent', 'text-slate-500');
+            activeBtn.classList.add('border-indigo-600', 'text-indigo-600');
+        }
+
+        function alternarPago(semIndex, itemIndex) {
+            dadosApp[mesAtual].semanas[semIndex].itens[itemIndex].pago = !dadosApp[mesAtual].semanas[semIndex].itens[itemIndex].pago;
+            salvarTudo();
+        }
+
+        function drag(ev, origemTipo, origemIndex, itemIndex) { ev.dataTransfer.setData("text/plain", JSON.stringify({ origemTipo, origemIndex, itemIndex })); }
+        function allowDrop(ev) { ev.preventDefault(); ev.currentTarget.classList.add('drag-over'); }
+        function leaveDrop(ev) { ev.currentTarget.classList.remove('drag-over'); }
+        function drop(ev, destinoSemIndex) {
+            ev.preventDefault(); ev.currentTarget.classList.remove('drag-over');
+            let data = JSON.parse(ev.dataTransfer.getData("text/plain"));
+            let itemMovido = data.origemTipo === 'gaveta' ? dadosApp[mesAtual].gaveta.splice(data.itemIndex, 1)[0] : dadosApp[mesAtual].semanas[data.origemIndex].itens.splice(data.itemIndex, 1)[0];
+            dadosApp[mesAtual].semanas[destinoSemIndex].itens.push(itemMovido);
+            salvarTudo();
+        }
+        function dropGaveta(ev) {
+            ev.preventDefault(); ev.currentTarget.classList.remove('drag-over');
+            let data = JSON.parse(ev.dataTransfer.getData("text/plain"));
+            if (data.origemTipo === 'gaveta') return;
+            let itemMovido = dadosApp[mesAtual].semanas[data.origemIndex].itens.splice(data.itemIndex, 1)[0];
+            dadosApp[mesAtual].gaveta.push(itemMovido);
+            salvarTudo();
+        }
+
+        function sincronizarFaturasNasSemanas() {
+            const data = dadosApp[mesAtual];
+            if (!data) return;
+            configCartoes.forEach(cartao => {
+                let chaveItens = `itens${cartao.nome}`;
+                let itensFatura = data[chaveItens] || [];
+                let totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
+                let nomeItemCard = `Cartão ${cartao.nome}`;
+                let semIdx = cartao.semanaTeto;
+                data.semanas.forEach(s => { s.itens = s.itens.filter(it => !it.desc.startsWith(nomeItemCard)); });
+                if (data.semanas[semIdx] && totalRealFatura > 0) {
+                    data.semanas[semIdx].itens.push({ desc: `${nomeItemCard} (Fatura)`, valor: totalRealFatura, tipo: 'saida', pago: false });
+                }
+            });
+        }
+
+        function calcularTetosDinamicos() {
+            const data = dadosApp[mesAtual];
+            if(!data) return;
+            configCartoes.forEach(c => {
+                let chaveItens = `itens${c.nome}`;
+                if (!data[chaveItens]) data[chaveItens] = gerarItensCartaoParaMes(mesAtual, c.nome);
+            });
+            sincronizarFaturasNasSemanas();
+            document.getElementById('lblMesCartoes').innerText = data.nomeExibicao;
+            const grid = document.getElementById('gridCartoesDinamicos');
+            grid.innerHTML = '';
+
+            configCartoes.forEach(cartao => {
+                let saldoSemanaTeto = 0;
+                let semIdx = cartao.semanaTeto;
+                if(data.semanas[semIdx]) {
+                    (data.semanas[semIdx].itens || []).forEach(it => {
+                        if(it.tipo === 'entra' || it.tipo === 'resgate') saldoSemanaTeto += it.valor;
+                        else if(it.tipo === 'saida' && !it.desc.startsWith(`Cartão ${cartao.nome}`)) saldoSemanaTeto -= it.valor;
+                        else if(it.tipo === 'aplicacao') saldoSemanaTeto -= it.valor;
+                    });
+                }
+                let chaveItens = `itens${cartao.nome}`;
+                let itensFatura = data[chaveItens] || [];
+                let totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
+                let tetoDisponivel = saldoSemanaTeto - totalRealFatura;
+                let corBg = cartao.cor === 'rose' ? 'bg-rose-500' : (cartao.cor === 'emerald' ? 'bg-emerald-600' : (cartao.cor === 'amber' ? 'bg-amber-600' : 'bg-indigo-600'));
+                let corTxt = cartao.cor === 'rose' ? 'text-rose-700' : (cartao.cor === 'emerald' ? 'text-emerald-700' : (cartao.cor === 'amber' ? 'text-amber-700' : 'text-indigo-700'));
+
+                let linhasItens = itensFatura.map((item, idx) => `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-2 font-medium text-slate-800">${item.desc}</td>
+                        <td class="p-2 text-slate-600">R$ ${item.orcado.toFixed(2).replace('.', ',')}</td>
+                        <td class="p-2 font-semibold text-slate-800">R$ ${item.real.toFixed(2).replace('.', ',')}</td>
+                        <td class="p-2 text-center">
+                            <button onclick="abrirModalGastoCartao('${cartao.nome}', ${idx})" class="text-slate-400 hover:text-indigo-600 px-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                            <button onclick="excluirGastoCartao('${cartao.nome}', ${idx})" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                grid.innerHTML += `
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                        <div class="${corBg} text-white p-4 flex justify-between items-center">
+                            <div><h3 class="font-bold text-base">${cartao.nome}</h3><p class="text-xs opacity-90">Teto Semana ${semIdx + 1} • Fatura: R$ ${totalRealFatura.toFixed(2).replace('.', ',')}</p></div>
+                            <span class="bg-black/20 text-xs px-2.5 py-1 rounded-full font-medium">Limite R$ ${cartao.limite.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                        <div class="p-4 space-y-4 flex-1">
+                            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+                                <span class="text-[10px] ${corTxt} font-bold block uppercase">Teto Disponível:</span>
+                                <span class="text-xl font-bold ${corTxt}">R$ ${tetoDisponivel.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                            <div>
+                                <div class="flex justify-between items-center mb-1"><label class="text-xs font-semibold text-slate-700">Fatura</label><button onclick="abrirModalGastoCartao('${cartao.nome}')" class="text-xs text-indigo-600 font-semibold hover:underline"><i class="fa-solid fa-plus"></i> Adicionar Gasto</button></div>
+                                <div class="overflow-x-auto border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
+                                    <table class="w-full text-left text-xs"><thead class="bg-slate-100 text-slate-600 uppercase"><tr><th class="p-2">Desc</th><th class="p-2">Orçado</th><th class="p-2">Real</th><th class="p-2 text-center">Ações</th></tr></thead><tbody class="divide-y divide-slate-100">${linhasItens}</tbody></table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function abrirModalTabelaPlanilha() {
+            const container = document.getElementById('conteudoPlanilhaConsolidada');
+            container.innerHTML = '';
+            configCartoes.forEach(cartao => {
+                let orcamentosCartao = configOrcamentos.filter(o => (o.cartao || '').toLowerCase().replace('cartão','').trim() === cartao.nome.toLowerCase().replace('cartão','').trim());
+                let categorias = orcamentosCartao.map(o => o.desc);
+                if(!categorias.includes('PARCELAS')) categorias.push('PARCELAS');
+                let cabecalhoCols = categorias.map(cat => `<th class="p-2 border text-center text-[11px] uppercase">${cat}</th>`).join('');
+                let linhasMeses = '';
+                for (let mKey in dadosApp) {
+                    let mData = dadosApp[mKey];
+                    let itensFatura = mData[`itens${cartao.nome}`] || [];
+                    let totalMes = 0;
+                    let celdasCat = categorias.map(cat => {
+                        let val = cat === 'PARCELAS' ? itensFatura.filter(i => i.desc.startsWith('[Parcela]')).reduce((a,b)=>a+b.real,0) : (itensFatura.find(i=>i.desc===cat)?.real || 0);
+                        totalMes += val;
+                        return `<td class="p-2 border text-center">${val > 0 ? 'R$ ' + val.toFixed(2).replace('.', ',') : '-'}</td>`;
+                    }).join('');
+                    linhasMeses += `<tr><td class="p-2 border font-bold bg-slate-50">${(mData.nomeExibicao||mKey).substring(0,3).toUpperCase()}</td>${celdasCat}<td class="p-2 border text-center font-bold text-indigo-700 bg-slate-50">R$ ${totalMes.toFixed(2).replace('.', ',')}</td></tr>`;
+                }
+                container.innerHTML += `<div><h4 class="font-bold text-sm mb-2 uppercase">${cartao.nome}</h4><div class="overflow-x-auto"><table class="w-full text-left text-xs border rounded-lg"><thead class="bg-indigo-600 text-white"><tr><th class="p-2 border">Mês</th>${cabecalhoCols}<th class="p-2 border text-center">TOTAL</th></tr></thead><tbody class="divide-y">${linhasMeses}</tbody></table></div></div>`;
+            });
+            document.getElementById('modalTabelaPlanilha').classList.remove('hidden'); document.getElementById('modalTabelaPlanilha').classList.add('flex');
+        }
+        function fecharModalTabelaPlanilha() { document.getElementById('modalTabelaPlanilha').classList.remove('flex'); document.getElementById('modalTabelaPlanilha').classList.add('hidden'); }
+
+        function abrirModalGastoCartao(cartao, itemIdx = null) {
+            document.getElementById('cartaoAlvo').value = cartao; document.getElementById('gastoCartaoIdx').value = itemIdx !== null ? itemIdx : '';
+            let itens = dadosApp[mesAtual][`itens${cartao}`] || [];
+            if(itemIdx !== null) {
+                let item = itens[itemIdx];
+                document.getElementById('tituloModalGastoCartao').innerText = `Editar Gasto (${cartao})`;
+                document.getElementById('gastoDesc').value = item.desc; document.getElementById('gastoOrcado').value = item.orcado; document.getElementById('gastoReal').value = item.real;
+            } else {
+                document.getElementById('tituloModalGastoCartao').innerText = `Adicionar Gasto (${cartao})`;
+                document.getElementById('gastoDesc').value = ''; document.getElementById('gastoOrcado').value = ''; document.getElementById('gastoReal').value = '';
+            }
+            document.getElementById('modalGastoCartao').classList.remove('hidden'); document.getElementById('modalGastoCartao').classList.add('flex');
+        }
+        function fecharModalGastoCartao() { document.getElementById('modalGastoCartao').classList.remove('flex'); document.getElementById('modalGastoCartao').classList.add('hidden'); }
+        function salvarGastoCartao() {
+            const cartao = document.getElementById('cartaoAlvo').value;
+            const itemIdx = document.getElementById('gastoCartaoIdx').value;
+            const desc = document.getElementById('gastoDesc').value;
+            const orcado = parseFloat(document.getElementById('gastoOrcado').value) || 0;
+            const real = parseFloat(document.getElementById('gastoReal').value) || 0;
+            if(!desc) return;
+            let chaveItens = `itens${cartao}`;
+            if(!dadosApp[mesAtual][chaveItens]) dadosApp[mesAtual][chaveItens] = [];
+            let itens = dadosApp[mesAtual][chaveItens];
+            if(itemIdx !== '') itens[itemIdx] = { id: itens[itemIdx].id, desc, orcado, real };
+            else itens.push({ id: Date.now(), desc, orcado, real });
+            fecharModalGastoCartao(); salvarTudo();
+        }
+        function excluirGastoCartao(cartao, itemIdx) {
+            if(confirm('Excluir?')) { dadosApp[mesAtual][`itens${cartao}`].splice(itemIdx, 1); salvarTudo(); }
+        }
+
+        function verificarTipoTransacao(tipo) {
+            const containerReserva = document.getElementById('containerEscolhaReserva');
+            const selectReserva = document.getElementById('transacaoQuadroReserva');
+            if (tipo === 'aplicacao' || tipo === 'resgate') {
+                containerReserva.classList.remove('hidden');
+                selectReserva.innerHTML = quadrosReservasApp.map(q => `<option value="${q.id}">${q.nome} (Saldo: R$ ${q.saldo.toFixed(2)})</option>`).join('');
+            } else { containerReserva.classList.add('hidden'); }
+        }
+
+        function abrirModalTransacao(origemIdx = -1, itemIndex = null) {
+            document.getElementById('transacaoSemanaIdx').value = origemIdx; document.getElementById('transacaoItemIdx').value = itemIndex !== null ? itemIndex : '';
+            let selectDest = document.getElementById('transacaoSemanaDestino');
+            selectDest.innerHTML = '<option value="-1">Gaveta de Fixos</option>';
+            dadosApp[mesAtual].semanas.forEach((s, idx) => { selectDest.innerHTML += `<option value="${idx}">Semana ${idx + 1} (${s.periodo})</option>`; });
+            selectDest.value = origemIdx;
+            document.getElementById('transacaoTipo').value = 'saida'; verificarTipoTransacao('saida');
+            if(itemIndex !== null) {
+                let item = origemIdx === -1 ? dadosApp[mesAtual].gaveta[itemIndex] : dadosApp[mesAtual].semanas[origemIdx].itens[itemIndex];
+                document.getElementById('tituloModalTransacao').innerText = "Editar Transação";
+                document.getElementById('transacaoDesc').value = item.desc; document.getElementById('transacaoValor').value = item.valor; document.getElementById('transacaoTipo').value = item.tipo || 'saida';
+                verificarTipoTransacao(item.tipo || 'saida');
+            } else {
+                document.getElementById('tituloModalTransacao').innerText = "Adicionar Conta / Transação";
+                document.getElementById('transacaoDesc').value = ''; document.getElementById('transacaoValor').value = '';
+            }
+            document.getElementById('modalTransacao').classList.remove('hidden'); document.getElementById('modalTransacao').classList.add('flex');
+        }
+        function fecharModalTransacao() { document.getElementById('modalTransacao').classList.remove('flex'); document.getElementById('modalTransacao').classList.add('hidden'); }
+        
+        function salvarTransacao() {
+            const origemIdx = parseInt(document.getElementById('transacaoSemanaIdx').value);
+            const itemIdx = document.getElementById('transacaoItemIdx').value;
+            const desc = document.getElementById('transacaoDesc').value;
+            const valor = parseFloat(document.getElementById('transacaoValor').value);
+            const tipo = document.getElementById('transacaoTipo').value;
+            const destinoIdx = parseInt(document.getElementById('transacaoSemanaDestino').value);
+            const quadroId = document.getElementById('transacaoQuadroReserva').value;
+            if(!desc || isNaN(valor)) return alert('Preencha corretamente.');
+
+            if (tipo === 'aplicacao') {
+                let q = quadrosReservasApp.find(item => item.id === quadroId);
+                if(q) q.saldo += valor;
+            } else if (tipo === 'resgate') {
+                let q = quadrosReservasApp.find(item => item.id === quadroId);
+                if(q) { if(valor > q.saldo) return alert('Saldo insuficiente.'); q.saldo -= valor; }
+            }
+
+            if(itemIdx !== '') {
+                let item = origemIdx === -1 ? dadosApp[mesAtual].gaveta[itemIdx] : dadosApp[mesAtual].semanas[origemIdx].itens[itemIdx];
+                item.desc = desc; item.valor = valor; item.tipo = tipo;
+                if(origemIdx !== destinoIdx) {
+                    if(origemIdx === -1) dadosApp[mesAtual].gaveta.splice(itemIdx, 1);
+                    else dadosApp[mesAtual].semanas[origemIdx].itens.splice(itemIdx, 1);
+                    if(destinoIdx === -1) dadosApp[mesAtual].gaveta.push(item);
+                    else dadosApp[mesAtual].semanas[destinoIdx].itens.push(item);
+                }
+            } else {
+                let novoItem = { desc, valor, tipo, pago: false };
+                if(destinoIdx === -1) dadosApp[mesAtual].gaveta.push(novoItem);
+                else dadosApp[mesAtual].semanas[destinoIdx].itens.push(novoItem);
+            }
+            fecharModalTransacao(); salvarTudo();
+        }
+
+        function excluirTransacao(origemIdx, itemIdx) {
+            if(confirm('Excluir?')) {
+                if(origemIdx === -1) dadosApp[mesAtual].gaveta.splice(itemIdx, 1);
+                else dadosApp[mesAtual].semanas[origemIdx].itens.splice(itemIdx, 1);
+                salvarTudo();
+            }
+        }
+
+        function abrirModalNovoMes() {
+            let d = new Date();
+            document.getElementById('inputMesAno').value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+            document.getElementById('inputMesNome').value = `Mês`;
+            document.getElementById('modalNovoMes').classList.remove('hidden'); document.getElementById('modalNovoMes').classList.add('flex');
+        }
+        function fecharModalNovoMes() { document.getElementById('modalNovoMes').classList.remove('flex'); document.getElementById('modalNovoMes').classList.add('hidden'); }
+        
+        function criarNovoMes() {
+            let id = document.getElementById('inputMesAno').value.trim();
+            let nome = document.getElementById('inputMesNome').value.trim();
+            if(!id || !nome) return;
+            dadosApp[id] = {
+                nomeExibicao: nome, tituloAlerta: `${nome}: Planejamento`, textoAlerta: "Organize seus gastos.",
+                gaveta: construirGavetaParaMes(id),
+                semanas: [{periodo:"01 a 07", nome:"1ª", itens:[]}, {periodo:"08 a 15", nome:"2ª", itens:[]}, {periodo:"16 a 22", nome:"3ª", itens:[]}, {periodo:"23 a 30", nome:"4ª", itens:[]}]
+            };
+            configCartoes.forEach(c => { dadosApp[id][`itens${c.nome}`] = gerarItensCartaoParaMes(id, c.nome); });
+            mesAtual = id; fecharModalNovoMes(); salvarTudo();
+        }
+
+        function abrirModalSemanaExtra() { document.getElementById('modalSemanaExtra').classList.remove('hidden'); document.getElementById('modalSemanaExtra').classList.add('flex'); }
+        function fecharModalSemanaExtra() { document.getElementById('modalSemanaExtra').classList.remove('flex'); document.getElementById('modalSemanaExtra').classList.add('hidden'); }
+        function confirmarSemanaExtra() {
+            let p = document.getElementById('inputPeriodoExtra').value;
+            if(!p) return;
+            dadosApp[mesAtual].semanas.push({ periodo: p, nome: `Extra`, itens: [] });
+            fecharModalSemanaExtra(); salvarTudo();
+        }
+
+        function abrirModalParcelado() {
+            let sel = document.getElementById('parcDestino');
+            sel.innerHTML = '<option value="Boleto / Gaveta">Boleto / Gaveta</option>';
+            configCartoes.forEach(c => { sel.innerHTML += `<option value="${c.nome}">Cartão ${c.nome}</option>`; });
+            document.getElementById('modalParcelado').classList.remove('hidden'); document.getElementById('modalParcelado').classList.add('flex');
+        }
+        function fecharModalParcelado() { document.getElementById('modalParcelado').classList.remove('flex'); document.getElementById('modalParcelado').classList.add('hidden'); }
+        function salvarParcelado() {
+            let desc = document.getElementById('parcDesc').value;
+            let valor = parseFloat(document.getElementById('parcValor').value);
+            let destino = document.getElementById('parcDestino').value;
+            let inicio = document.getElementById('parcInicio').value;
+            let fim = document.getElementById('parcFim').value;
+            if(!desc || isNaN(valor)) return;
+            parceladosApp.push({ id: Date.now(), desc, valor, destino, inicio, fim });
+            fecharModalParcelado(); salvarTudo();
+        }
+        function renderizarParcelados() {
+            const tbody = document.getElementById('tabelaParcelados'); tbody.innerHTML = '';
+            parceladosApp.forEach(p => {
+                tbody.innerHTML += `<tr class="border-b"><td class="p-2.5">${p.desc}</td><td class="p-2.5">${p.destino}</td><td class="p-2.5">R$ ${p.valor.toFixed(2)}</td><td class="p-2.5">${p.inicio||'-'} → ${p.fim||'-'}</td><td class="p-2.5 text-center"><button onclick="parceladosApp=parceladosApp.filter(x=>x.id!==${p.id});salvarTudo();" class="text-rose-500"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+            });
+        }
+
+        function renderizarReservas() {
+            const grid = document.getElementById('gridQuadrosReservas'); grid.innerHTML = '';
+            if(quadrosReservasApp.length === 0) { grid.innerHTML = `<div class="col-span-2 text-center py-8 text-slate-400 text-xs">Nenhum quadro de reserva.</div>`; return; }
+            quadrosReservasApp.forEach(q => {
+                let meta = q.meta > 0 ? q.meta : 1; let perc = Math.min(100, (q.saldo / meta) * 100);
+                grid.innerHTML += `<div class="bg-white p-4 rounded-xl border shadow-sm space-y-3"><div class="flex justify-between items-center"><h4 class="font-bold text-sm">${q.nome}</h4><div class="flex gap-1"><button onclick="abrirModalMovQuadro('${q.id}','deposito')" class="bg-emerald-600 text-white text-[10px] px-2 py-1 rounded">+ Depósito</button><button onclick="abrirModalMovQuadro('${q.id}','retirada')" class="bg-rose-600 text-white text-[10px] px-2 py-1 rounded">- Retirada</button><button onclick="quadrosReservasApp=quadrosReservasApp.filter(x=>x.id!='${q.id}');salvarTudo();" class="text-rose-500 px-1 text-xs"><i class="fa-solid fa-trash"></i></button></div></div><div class="flex justify-between items-end"><div><span class="text-[10px] text-slate-400 block uppercase font-bold">Saldo</span><span class="text-xl font-extrabold text-indigo-900">R$ ${q.saldo.toFixed(2)}</span></div><span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">Meta: R$ ${q.meta.toFixed(2)} (${perc.toFixed(1)}%)</span></div><div class="w-full bg-slate-100 rounded-full h-2.5"><div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${perc}%"></div></div></div>`;
+            });
+        }
+        function abrirModalNovoQuadroReserva() { document.getElementById('modalNovoQuadroReserva').classList.remove('hidden'); document.getElementById('modalNovoQuadroReserva').classList.add('flex'); }
+        function fecharModalNovoQuadroReserva() { document.getElementById('modalNovoQuadroReserva').classList.remove('hidden'); document.getElementById('modalNovoQuadroReserva').classList.add('hidden'); }
+        function salvarNovoQuadroReserva() {
+            let nome = document.getElementById('novoQuadroNome').value; let meta = parseFloat(document.getElementById('novoQuadroMeta').value)||0; let saldo = parseFloat(document.getElementById('novoQuadroSaldo').value)||0;
+            if(!nome) return; quadrosReservasApp.push({ id: 'res_'+Date.now(), nome, saldo, meta }); fecharModalNovoQuadroReserva(); salvarTudo();
+        }
+        function abrirModalMovQuadro(id, tipo) {
+            document.getElementById('idQuadroAlvo').value = id; document.getElementById('tipoMovQuadro').value = tipo;
+            let q = quadrosReservasApp.find(x => x.id === id);
+            document.getElementById('tituloModalQuadroReserva').innerText = tipo === 'deposito' ? `Depositar em ${q.nome}` : `Retirar de ${q.nome}`;
+            document.getElementById('modalMovQuadroReserva').classList.remove('hidden'); document.getElementById('modalMovQuadroReserva').classList.add('flex');
+        }
+        function fecharModalMovQuadroReserva() { document.getElementById('modalMovQuadroReserva').classList.remove('flex'); document.getElementById('modalMovQuadroReserva').classList.add('hidden'); }
+        function confirmarMovQuadroReserva() {
+            let id = document.getElementById('idQuadroAlvo').value; let tipo = document.getElementById('tipoMovQuadro').value; let val = parseFloat(document.getElementById('valorMovQuadro').value); let desc = document.getElementById('descMovQuadro').value || 'Aporte';
+            let q = quadrosReservasApp.find(x => x.id === id); if(!q || isNaN(val)) return;
+            if(tipo === 'deposito') { q.saldo += val; dadosApp[mesAtual].gaveta.push({desc:`[Reserva+] ${q.nome}: ${desc}`, valor:val, tipo:'saida', pago:false}); }
+            else { if(val > q.saldo) return alert('Saldo insuficiente.'); q.saldo -= val; dadosApp[mesAtual].gaveta.push({desc:`[Reserva-] ${q.nome}: ${desc}`, valor:val, tipo:'entra', pago:false}); }
+            fecharModalMovQuadroReserva(); salvarTudo();
+        }
+
+        function renderizarAdmin() {
+            const tbFixos = document.getElementById('tabelaAdminFixos'); tbFixos.innerHTML = '';
+            configFixosPadrao.forEach((item, idx) => { tbFixos.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2">${item.desc}</td><td class="p-2 font-semibold">R$ ${item.valor.toFixed(2)}</td><td class="p-2 text-center"><button onclick="configFixosPadrao.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
+            const tbOrc = document.getElementById('tabelaAdminOrcamentos'); tbOrc.innerHTML = '';
+            configOrcamentos.forEach((o, idx) => { tbOrc.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2"><b>${o.desc}</b> (${o.cartao}): R$ ${o.valor.toFixed(2)}</td><td class="p-2 text-center"><button onclick="configOrcamentos.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
+            const tbCartoes = document.getElementById('tabelaAdminCartoes'); tbCartoes.innerHTML = '';
+            configCartoes.forEach((c, idx) => { tbCartoes.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2">${c.nome} (Lim: R$ ${c.limite.toFixed(2)})</td><td class="p-2 text-center"><button onclick="configCartoes.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
+        }
+        function abrirModalAdminItem() { document.getElementById('modalAdminItem').classList.remove('hidden'); document.getElementById('modalAdminItem').classList.add('flex'); }
+        function fecharModalAdminItem() { document.getElementById('modalAdminItem').classList.remove('hidden'); document.getElementById('modalAdminItem').classList.add('hidden'); }
+        function salvarAdminItem() {
+            let desc = document.getElementById('adminItemDesc').value; let valor = parseFloat(document.getElementById('adminItemValor').value); let tipo = document.getElementById('adminItemTipo').value;
+            if(!desc || isNaN(valor)) return; configFixosPadrao.push({desc, valor, tipo}); fecharModalAdminItem(); salvarTudo();
+        }
+        function abrirModalAdminOrcamento() {
+            document.getElementById('adminOrcCartao').innerHTML = configCartoes.map(c=>`<option value="${c.nome}">${c.nome}</option>`).join('');
+            document.getElementById('modalAdminOrcamento').classList.remove('hidden'); document.getElementById('modalAdminOrcamento').classList.add('flex');
+        }
+        function fecharModalAdminOrcamento() { document.getElementById('modalAdminOrcamento').classList.remove('hidden'); document.getElementById('modalAdminOrcamento').classList.add('hidden'); }
+        function salvarAdminOrcamento() {
+            let desc = document.getElementById('adminOrcDesc').value; let valor = parseFloat(document.getElementById('adminOrcValor').value); let cartao = document.getElementById('adminOrcCartao').value; let inicio = document.getElementById('adminOrcInicio').value; let fim = document.getElementById('adminOrcFim').value;
+            if(!desc || isNaN(valor)) return; configOrcamentos.push({id:Date.now(), desc, valor, cartao, inicio, fim}); fecharModalAdminOrcamento(); salvarTudo();
+        }
+        function abrirModalAdminCartao() { document.getElementById('modalAdminCartao').classList.remove('hidden'); document.getElementById('modalAdminCartao').classList.add('flex'); }
+        function fecharModalAdminCartao() { document.getElementById('modalAdminCartao').classList.remove('hidden'); document.getElementById('modalAdminCartao').classList.add('hidden'); }
+        function salvarAdminCartao() {
+            let nome = document.getElementById('adminCartaoNome').value; let limite = parseFloat(document.getElementById('adminCartaoLimite').value); let semanaTeto = parseInt(document.getElementById('adminCartaoSemanaTeto').value); let cor = document.getElementById('adminCartaoCor').value;
+            if(!nome || isNaN(limite)) return; configCartoes.push({id:Date.now(), nome, limite, semanaTeto, cor}); fecharModalAdminCartao(); salvarTudo();
+        }
+
+        function renderizarApp() {
+            const data = dadosApp[mesAtual]; if(!data) return; if(!data.gaveta) data.gaveta = [];
+            document.getElementById('alertaTitulo').innerText = data.tituloAlerta; document.getElementById('alertaTexto').innerText = data.textoAlerta;
+            calcularTetosDinamicos();
+
+            document.getElementById('contadorGaveta').innerText = data.gaveta.length;
+            const listaGaveta = document.getElementById('listaGaveta');
+            listaGaveta.innerHTML = data.gaveta.map((item, itemIdx) => `
+                <li draggable="true" ondragstart="drag(event, 'gaveta', -1, ${itemIdx})" class="py-2 px-2 bg-white rounded border shadow-sm flex items-center justify-between text-xs gap-2 cursor-grab">
+                    <span class="truncate font-medium">${item.desc}</span>
+                    <div class="flex items-center gap-1.5 whitespace-nowrap">
+                        <span class="font-semibold ${item.tipo === 'entra' ? 'text-emerald-600' : ''}">${item.tipo === 'entra'?'+':''}R$ ${item.valor.toFixed(2)}</span>
+                        <button onclick="abrirModalTransacao(-1, ${itemIdx})" class="text-slate-400 hover:text-indigo-600 px-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                        <button onclick="excluirTransacao(-1, ${itemIdx})" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+                    </div>
+                </li>
+            `).join('');
+
+            let totalEntradas = 0, totalSaidas = 0;
+            const gridSemanas = document.getElementById('gridSemanas'); gridSemanas.innerHTML = '';
+            data.semanas.forEach((sem, semIdx) => {
+                let entraSemana = 0, saidaSemana = 0;
+                let itensHtml = (sem.itens || []).map((item, itemIdx) => {
+                    if(item.tipo === 'entra' || item.tipo === 'resgate') entraSemana += item.valor;
+                    else if(item.tipo === 'saida' || item.tipo === 'aplicacao') saidaSemana += item.valor;
+                    return `
+                        <li draggable="true" ondragstart="drag(event, 'semana', ${semIdx}, ${itemIdx})" class="py-2 px-2 bg-white rounded border shadow-sm flex items-center justify-between text-xs gap-2 cursor-grab">
+                            <div class="flex items-center gap-2 overflow-hidden">
+                                <input type="checkbox" ${item.pago ? 'checked' : ''} onchange="alternarPago(${semIdx}, ${itemIdx})" class="rounded text-indigo-600 cursor-pointer">
+                                <span class="${item.pago ? 'line-through text-slate-400' : ''} truncate font-medium">${item.desc}</span>
+                            </div>
+                            <div class="flex items-center gap-1.5 whitespace-nowrap">
+                                <span class="font-semibold ${item.tipo === 'entra'||item.tipo==='resgate'?'text-emerald-600':''}">${item.tipo==='entra'||item.tipo==='resgate'?'+':''}R$ ${item.valor.toFixed(2)}</span>
+                                <button onclick="abrirModalTransacao(${semIdx}, ${itemIdx})" class="text-slate-400 hover:text-indigo-600 px-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                                <button onclick="excluirTransacao(${semIdx}, ${itemIdx})" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+                            </div>
+                        </li>
+                    `;
+                }).join('');
+
+                totalEntradas += entraSemana; totalSaidas += saidaSemana; let sobraSemana = entraSemana - saidaSemana;
+                gridSemanas.innerHTML += `
+                    <div class="bg-white rounded-xl border shadow-sm overflow-hidden flex flex-col">
+                        <div class="bg-slate-100 p-3 border-b flex justify-between items-center">
+                            <div><span class="text-[10px] uppercase font-bold text-slate-500">Semana ${semIdx + 1}</span><h4 class="text-xs font-bold">${sem.periodo}</h4></div>
+                            <div class="text-right"><span class="text-[10px] text-slate-400 block">Sobra</span><span class="text-xs font-bold ${sobraSemana>=0?'text-emerald-600':'text-rose-600'}">R$ ${sobraSemana.toFixed(2)}</span></div>
+                        </div>
+                        <div class="p-3 flex-1 flex flex-col justify-between kanban-drop-zone" ondragover="allowDrop(event)" ondragleave="leaveDrop(event)" ondrop="drop(event, ${semIdx})">
+                            <ul class="space-y-2 max-h-56 overflow-y-auto pr-1">${itensHtml}</ul>
+                            <button onclick="abrirModalTransacao(${semIdx})" class="mt-3 w-full py-1.5 border border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"><i class="fa-solid fa-plus"></i> Adicionar Conta</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('resumoEntradas').innerText = `R$ ${totalEntradas.toFixed(2)}`;
+            document.getElementById('resumoSaidas').innerText = `R$ ${totalSaidas.toFixed(2)}`;
+            document.getElementById('resumoSobra').innerText = `R$ ${(totalEntradas - totalSaidas).toFixed(2)}`;
+        }
+    </script>
+</body>
+</html>
