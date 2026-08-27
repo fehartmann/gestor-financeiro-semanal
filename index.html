@@ -122,7 +122,10 @@
                     </div>
                 </div>
 
-                <div class="flex justify-end">
+                <div class="flex justify-between items-center">
+                    <button onclick="restaurarGavetaPadrao()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition-colors" title="Puxa novamente os itens fixos padrão para a gaveta deste mês">
+                        <i class="fa-solid fa-rotate-right"></i> Restaurar Fixos na Gaveta
+                    </button>
                     <button onclick="abrirModalSemanaExtra()" class="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition-colors">
                         <i class="fa-solid fa-calendar-plus"></i> + Adicionar Semana Extra
                     </button>
@@ -165,11 +168,11 @@
                 <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
                     <div class="flex justify-between items-center">
                         <div>
-                            <h3 class="font-bold text-slate-800 text-base">Faturas Parceladas e Contas</h3>
-                            <p class="text-xs text-slate-500">Cadastre compras em cartão ou boletos/contas com vigência por período.</p>
+                            <h3 class="font-bold text-slate-800 text-base">Faturas Parceladas, Assinaturas e Contas</h3>
+                            <p class="text-xs text-slate-500">Cadastre compras em cartão, assinaturas contínuas ou boletos com vigência.</p>
                         </div>
                         <button onclick="abrirModalParcelado()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1">
-                            <i class="fa-solid fa-plus"></i> Nova Parcela / Conta
+                            <i class="fa-solid fa-plus"></i> Nova Parcela / Assinatura
                         </button>
                     </div>
                     <div class="overflow-x-auto">
@@ -310,11 +313,15 @@
 
     <div id="modalParcelado" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
-            <h3 class="font-bold text-slate-800 text-lg">Nova Parcela / Conta</h3>
-            <input type="text" id="parcDesc" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Descrição">
-            <input type="number" step="0.01" id="parcValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
+            <h3 class="font-bold text-slate-800 text-lg" id="tituloModalParcelado">Nova Parcela / Assinatura</h3>
+            <input type="hidden" id="parcIdEdicao">
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Descrição</label><input type="text" id="parcDesc" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Ex: Netflix, Academia, Compra..."></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Valor (R$)</label><input type="number" step="0.01" id="parcValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="0.00"></div>
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Destino</label><select id="parcDestino" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></select></div>
-            <div class="grid grid-cols-2 gap-2"><input type="month" id="parcInicio" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><input type="month" id="parcFim" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Início (Opcional)</label><input type="month" id="parcInicio" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Fim (Deixe em branco p/ contínuo)</label><input type="month" id="parcFim" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+            </div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalParcelado()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarParcelado()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
         </div>
     </div>
@@ -523,41 +530,37 @@
         function sincronizarMesCompleto(mesId) {
             if (!dadosApp[mesId]) return;
             
-            // 1. Gaveta de Fixos e Boletos (respeitando vigência de início e fim)
-            let gavetaAtual = JSON.parse(JSON.stringify(configFixosPadrao));
-            parceladosApp.forEach(p => {
-                let dest = (p.destino || '').toLowerCase();
-                if(dest.includes('gaveta') || dest.includes('boleto')) {
-                    if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
-                        gavetaAtual.push({ desc: `[Conta] ${p.desc}`, valor: p.valor, tipo: 'saida', pago: false });
-                    }
-                }
-            });
-            // Mantém os itens que o usuário já tinha puxado para o Kanban ou alterado na gaveta
-            dadosApp[mesId].gaveta = gavetaAtual;
+            // Se a gaveta ainda não existe para este mês, inicializa com os fixos padrão
+            if (!dadosApp[mesId].gaveta) {
+                dadosApp[mesId].gaveta = construirGavetaParaMes(mesId);
+            }
 
-            // 2. Cartões e Parcelas nos Cartões (respeitando vigência)
+            // Sincronização dos Cartões e Faturas
             configCartoes.forEach(cartao => {
                 let chaveItens = `itens${cartao.nome}`;
+                let itensExistentes = dadosApp[mesId][chaveItens] || [];
                 let itensValidos = [];
                 let nomeCartaoBusca = cartao.nome.toLowerCase().replace('cartão', '').trim();
 
-                // Adiciona orçamentos fixos do cartão para o mês
                 configOrcamentos.forEach(o => {
                     let cartaoOrc = (o.cartao || '').toLowerCase().replace('cartão', '').trim();
                     if (cartaoOrc === nomeCartaoBusca) {
                         if ((!o.inicio || mesId >= o.inicio) && (!o.fim || mesId <= o.fim)) {
-                            itensValidos.push({ id: Date.now() + Math.random(), desc: o.desc, orcado: o.valor, real: o.valor });
+                            let itemAntigo = itensExistentes.find(x => x.desc === o.desc);
+                            let valReal = itemAntigo ? itemAntigo.real : o.valor;
+                            itensValidos.push({ id: itemAntigo ? itemAntigo.id : (Date.now() + Math.random()), desc: o.desc, orcado: o.valor, real: valReal });
                         }
                     }
                 });
 
-                // Adiciona parcelas direcionadas ao cartão (se dentro da vigência)
                 parceladosApp.forEach(p => {
                     let dest = (p.destino || '').toLowerCase().replace('cartão', '').trim();
                     if (dest === nomeCartaoBusca) {
                         if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
-                            itensValidos.push({ id: Date.now() + Math.random(), desc: `[Parcela] ${p.desc}`, orcado: p.valor, real: p.valor });
+                            let descParcela = `[Parcela] ${p.desc}`;
+                            let itemAntigo = itensExistentes.find(x => x.desc === descParcela);
+                            let valReal = itemAntigo ? itemAntigo.real : p.valor;
+                            itensValidos.push({ id: itemAntigo ? itemAntigo.id : (Date.now() + Math.random()), desc: descParcela, orcado: p.valor, real: valReal });
                         }
                     }
                 });
@@ -572,11 +575,21 @@
                 let dest = (p.destino || '').toLowerCase();
                 if(dest.includes('gaveta') || dest.includes('boleto')) {
                     if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
-                        gaveta.push({ desc: `[Conta] ${p.desc}`, valor: p.valor, tipo: 'saida', pago: false });
+                        let descGaveta = `[Conta] ${p.desc}`;
+                        if (!gaveta.some(g => g.desc === descGaveta)) {
+                            gaveta.push({ desc: descGaveta, valor: p.valor, tipo: 'saida', pago: false });
+                        }
                     }
                 }
             });
             return gaveta;
+        }
+
+        function restaurarGavetaPadrao() {
+            if(confirm('Deseja restaurar os itens fixos padrão na gaveta deste mês? (Itens que já foram removidos ou jogados nas semanas voltarão a aparecer na gaveta).')) {
+                dadosApp[mesAtual].gaveta = construirGavetaParaMes(mesAtual);
+                salvarTudo();
+            }
         }
 
         function atualizarSeletorMeses() {
@@ -709,8 +722,8 @@
                         <td class="p-2 text-slate-600">R$ ${item.orcado.toFixed(2).replace('.', ',')}</td>
                         <td class="p-2 font-semibold text-slate-800">R$ ${item.real.toFixed(2).replace('.', ',')}</td>
                         <td class="p-2 text-center">
-                            <button onclick="abrirModalGastoCartao('${cartao.nome}', ${idx})" class="text-slate-400 hover:text-indigo-600 px-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
-                            <button onclick="excluirGastoCartao('${cartao.nome}', ${idx})" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+                            <button onclick="abrirModalGastoCartao('${cartao.nome}', ${idx})" class="text-slate-400 hover:text-indigo-600 px-1" title="Editar Gasto"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                            <button onclick="excluirGastoCartao('${cartao.nome}', ${idx})" class="text-slate-400 hover:text-rose-600 px-1" title="Excluir Gasto"><i class="fa-solid fa-xmark text-[10px]"></i></button>
                         </td>
                     </tr>
                 `).join('');
@@ -727,7 +740,7 @@
                                 <span class="text-xl font-bold ${corTxt}">R$ ${tetoDisponivel.toFixed(2).replace('.', ',')}</span>
                             </div>
                             <div>
-                                <div class="flex justify-between items-center mb-1"><label class="text-xs font-semibold text-slate-700">Fatura</label><button onclick="abrirModalGastoCartao('${cartao.nome}')" class="text-xs text-indigo-600 font-semibold hover:underline"><i class="fa-solid fa-plus"></i> Adicionar Gasto</button></div>
+                                <div class="flex justify-between items-center mb-1"><label class="text-xs font-semibold text-slate-700">Fatura</label><button onclick="abrirModalGastoCartao('${cartao.nome}')" class="text-xs text-indigo-600 font-semibold hover:underline"><i class="fa-solid fa-plus"></i> Adicionar Gasto Avulso</button></div>
                                 <div class="overflow-x-auto border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
                                     <table class="w-full text-left text-xs"><thead class="bg-slate-100 text-slate-600 uppercase"><tr><th class="p-2">Desc</th><th class="p-2">Orçado</th><th class="p-2">Real</th><th class="p-2 text-center">Ações</th></tr></thead><tbody class="divide-y divide-slate-100">${linhasItens}</tbody></table>
                                 </div>
@@ -765,37 +778,60 @@
         function fecharModalTabelaPlanilha() { document.getElementById('modalTabelaPlanilha').classList.remove('flex'); document.getElementById('modalTabelaPlanilha').classList.add('hidden'); }
 
         function abrirModalGastoCartao(cartao, itemIdx = null) {
-            document.getElementById('cartaoAlvo').value = cartao; document.getElementById('gastoCartaoIdx').value = itemIdx !== null ? itemIdx : '';
+            document.getElementById('cartaoAlvo').value = cartao; 
+            document.getElementById('gastoCartaoIdx').value = itemIdx !== null ? itemIdx : '';
             let chaveItens = `itens${cartao}`;
             if(!dadosApp[mesAtual][chaveItens]) dadosApp[mesAtual][chaveItens] = [];
             let itens = dadosApp[mesAtual][chaveItens];
-            if(itemIdx !== null) {
+            
+            if(itemIdx !== null && itens[itemIdx]) {
                 let item = itens[itemIdx];
                 document.getElementById('tituloModalGastoCartao').innerText = `Editar Gasto (${cartao})`;
-                document.getElementById('gastoDesc').value = item.desc; document.getElementById('gastoOrcado').value = item.orcado; document.getElementById('gastoReal').value = item.real;
+                document.getElementById('gastoDesc').value = item.desc; 
+                document.getElementById('gastoOrcado').value = item.orcado; 
+                document.getElementById('gastoReal').value = item.real;
             } else {
                 document.getElementById('tituloModalGastoCartao').innerText = `Adicionar Gasto (${cartao})`;
-                document.getElementById('gastoDesc').value = ''; document.getElementById('gastoOrcado').value = ''; document.getElementById('gastoReal').value = '';
+                document.getElementById('gastoDesc').value = ''; 
+                document.getElementById('gastoOrcado').value = ''; 
+                document.getElementById('gastoReal').value = '';
             }
-            document.getElementById('modalGastoCartao').classList.remove('hidden'); document.getElementById('modalGastoCartao').classList.add('flex');
+            document.getElementById('modalGastoCartao').classList.remove('hidden'); 
+            document.getElementById('modalGastoCartao').classList.add('flex');
         }
         function fecharModalGastoCartao() { document.getElementById('modalGastoCartao').classList.remove('flex'); document.getElementById('modalGastoCartao').classList.add('hidden'); }
+        
         function salvarGastoCartao() {
             const cartao = document.getElementById('cartaoAlvo').value;
-            const itemIdx = document.getElementById('gastoCartaoIdx').value;
+            const itemIdxStr = document.getElementById('gastoCartaoIdx').value;
             const desc = document.getElementById('gastoDesc').value;
             const orcado = parseFloat(document.getElementById('gastoOrcado').value) || 0;
             const real = parseFloat(document.getElementById('gastoReal').value) || 0;
-            if(!desc) return;
+            if(!desc) return alert('Informe a descrição do gasto.');
+            
             let chaveItens = `itens${cartao}`;
             if(!dadosApp[mesAtual][chaveItens]) dadosApp[mesAtual][chaveItens] = [];
             let itens = dadosApp[mesAtual][chaveItens];
-            if(itemIdx !== '') itens[itemIdx] = { id: itens[itemIdx].id, desc, orcado, real };
-            else itens.push({ id: Date.now(), desc, orcado, real });
-            fecharModalGastoCartao(); salvarTudo();
+
+            if(itemIdxStr !== '') {
+                let idx = parseInt(itemIdxStr);
+                if(itens[idx]) {
+                    itens[idx].desc = desc;
+                    itens[idx].orcado = orcado;
+                    itens[idx].real = real;
+                }
+            } else {
+                itens.push({ id: Date.now(), desc, orcado, real });
+            }
+            fecharModalGastoCartao(); 
+            salvarTudo();
         }
+
         function excluirGastoCartao(cartao, itemIdx) {
-            if(confirm('Excluir?')) { dadosApp[mesAtual][`itens${cartao}`].splice(itemIdx, 1); salvarTudo(); }
+            if(confirm('Tem certeza que deseja excluir este gasto do cartão?')) { 
+                dadosApp[mesAtual][`itens${cartao}`].splice(itemIdx, 1); 
+                salvarTudo(); 
+            }
         }
 
         function verificarTipoTransacao(tipo) {
@@ -900,32 +936,80 @@
             fecharModalSemanaExtra(); salvarTudo();
         }
 
-        function abrirModalParcelado() {
+        function abrirModalParcelado(id = null) {
             let sel = document.getElementById('parcDestino');
             sel.innerHTML = '<option value="Boleto / Gaveta">Boleto / Gaveta</option>';
             configCartoes.forEach(c => { sel.innerHTML += `<option value="${c.nome}">Cartão ${c.nome}</option>`; });
+            
+            if(id !== null) {
+                let p = parceladosApp.find(x => x.id === id);
+                if(p) {
+                    document.getElementById('tituloModalParcelado').innerText = 'Editar Parcela / Assinatura';
+                    document.getElementById('parcIdEdicao').value = p.id;
+                    document.getElementById('parcDesc').value = p.desc;
+                    document.getElementById('parcValor').value = p.valor;
+                    document.getElementById('parcDestino').value = p.destino;
+                    document.getElementById('parcInicio').value = p.inicio || '';
+                    document.getElementById('parcFim').value = p.fim || '';
+                }
+            } else {
+                document.getElementById('tituloModalParcelado').innerText = 'Nova Parcela / Assinatura';
+                document.getElementById('parcIdEdicao').value = '';
+                document.getElementById('parcDesc').value = '';
+                document.getElementById('parcValor').value = '';
+                document.getElementById('parcDestino').value = 'Boleto / Gaveta';
+                document.getElementById('parcInicio').value = '';
+                document.getElementById('parcFim').value = '';
+            }
             document.getElementById('modalParcelado').classList.remove('hidden'); document.getElementById('modalParcelado').classList.add('flex');
         }
         function fecharModalParcelado() { document.getElementById('modalParcelado').classList.remove('flex'); document.getElementById('modalParcelado').classList.add('hidden'); }
+        
         function salvarParcelado() {
+            let idEdicao = document.getElementById('parcIdEdicao').value;
             let desc = document.getElementById('parcDesc').value;
             let valor = parseFloat(document.getElementById('parcValor').value);
             let destino = document.getElementById('parcDestino').value;
             let inicio = document.getElementById('parcInicio').value;
             let fim = document.getElementById('parcFim').value;
-            if(!desc || isNaN(valor)) return;
-            parceladosApp.push({ id: Date.now(), desc, valor, destino, inicio, fim });
+            if(!desc || isNaN(valor)) return alert('Preencha a descrição e o valor corretamente.');
+
+            if(idEdicao !== '') {
+                let p = parceladosApp.find(x => x.id == idEdicao);
+                if(p) {
+                    p.desc = desc; p.valor = valor; p.destino = destino; p.inicio = inicio; p.fim = fim;
+                }
+            } else {
+                parceladosApp.push({ id: Date.now(), desc, valor, destino, inicio, fim });
+            }
             fecharModalParcelado(); salvarTudo();
         }
+
         function renderizarParcelados() {
             const tbody = document.getElementById('tabelaParcelados'); tbody.innerHTML = '';
+            if(parceladosApp.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">Nenhuma parcela ou assinatura cadastrada.</td></tr>`;
+                return;
+            }
             parceladosApp.forEach(p => {
-                tbody.innerHTML += `<tr class="border-b"><td class="p-2.5">${p.desc}</td><td class="p-2.5">${p.destino}</td><td class="p-2.5">R$ ${p.valor.toFixed(2)}</td><td class="p-2.5">${p.inicio||'-'} → ${p.fim||'-'}</td><td class="p-2.5 text-center"><button onclick="excluirParcela(${p.id})" class="text-rose-500"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+                let validadeTxt = `${p.inicio || 'Início Livre'} → ${p.fim || 'Contínuo (Indeterminado)'}`;
+                tbody.innerHTML += `
+                    <tr class="border-b hover:bg-slate-50">
+                        <td class="p-2.5 font-medium text-slate-800">${p.desc}</td>
+                        <td class="p-2.5 text-slate-600">${p.destino}</td>
+                        <td class="p-2.5 font-semibold text-slate-800">R$ ${p.valor.toFixed(2).replace('.', ',')}</td>
+                        <td class="p-2.5 text-slate-500">${validadeTxt}</td>
+                        <td class="p-2.5 text-center">
+                            <button onclick="abrirModalParcelado(${p.id})" class="text-slate-400 hover:text-indigo-600 px-1.5" title="Editar"><i class="fa-solid fa-pen text-xs"></i></button>
+                            <button onclick="excluirParcela(${p.id})" class="text-slate-400 hover:text-rose-600 px-1.5" title="Excluir"><i class="fa-solid fa-trash text-xs"></i></button>
+                        </td>
+                    </tr>
+                `;
             });
         }
 
         function excluirParcela(id) {
-            if(confirm('Tem certeza que deseja excluir esta parcela/conta? Ela será removida de todos os cartões e meses.')) {
+            if(confirm('Tem certeza que deseja excluir esta parcela/assinatura? Ela será removida de todos os cartões e meses.')) {
                 parceladosApp = parceladosApp.filter(x => x.id !== id);
                 salvarTudo();
             }
