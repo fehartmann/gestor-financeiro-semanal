@@ -484,12 +484,8 @@
                 };
             }
 
-            // Sincroniza cartões para todos os meses existentes ao carregar
             for (let mKey in dadosApp) {
-                if(!dadosApp[mKey].gaveta) dadosApp[mKey].gaveta = construirGavetaParaMes(mKey);
-                configCartoes.forEach(c => {
-                    sincronizarItensCartaoParaMes(mKey, c.nome);
-                });
+                sincronizarMesCompleto(mKey);
             }
 
             atualizarSeletorMeses();
@@ -501,10 +497,7 @@
 
         async function salvarTudo() {
             for (let mKey in dadosApp) {
-                configCartoes.forEach(c => {
-                    sincronizarItensCartaoParaMes(mKey, c.nome);
-                });
-                dadosApp[mKey].gaveta = construirGavetaParaMes(mKey);
+                sincronizarMesCompleto(mKey);
             }
 
             let pacoteDados = {
@@ -527,52 +520,63 @@
             renderizarReservas();
         }
 
+        function sincronizarMesCompleto(mesId) {
+            if (!dadosApp[mesId]) return;
+            
+            // 1. Gaveta de Fixos e Boletos (respeitando vigência de início e fim)
+            let gavetaAtual = JSON.parse(JSON.stringify(configFixosPadrao));
+            parceladosApp.forEach(p => {
+                let dest = (p.destino || '').toLowerCase();
+                if(dest.includes('gaveta') || dest.includes('boleto')) {
+                    if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
+                        gavetaAtual.push({ desc: `[Conta] ${p.desc}`, valor: p.valor, tipo: 'saida', pago: false });
+                    }
+                }
+            });
+            // Mantém os itens que o usuário já tinha puxado para o Kanban ou alterado na gaveta
+            dadosApp[mesId].gaveta = gavetaAtual;
+
+            // 2. Cartões e Parcelas nos Cartões (respeitando vigência)
+            configCartoes.forEach(cartao => {
+                let chaveItens = `itens${cartao.nome}`;
+                let itensValidos = [];
+                let nomeCartaoBusca = cartao.nome.toLowerCase().replace('cartão', '').trim();
+
+                // Adiciona orçamentos fixos do cartão para o mês
+                configOrcamentos.forEach(o => {
+                    let cartaoOrc = (o.cartao || '').toLowerCase().replace('cartão', '').trim();
+                    if (cartaoOrc === nomeCartaoBusca) {
+                        if ((!o.inicio || mesId >= o.inicio) && (!o.fim || mesId <= o.fim)) {
+                            itensValidos.push({ id: Date.now() + Math.random(), desc: o.desc, orcado: o.valor, real: o.valor });
+                        }
+                    }
+                });
+
+                // Adiciona parcelas direcionadas ao cartão (se dentro da vigência)
+                parceladosApp.forEach(p => {
+                    let dest = (p.destino || '').toLowerCase().replace('cartão', '').trim();
+                    if (dest === nomeCartaoBusca) {
+                        if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
+                            itensValidos.push({ id: Date.now() + Math.random(), desc: `[Parcela] ${p.desc}`, orcado: p.valor, real: p.valor });
+                        }
+                    }
+                });
+
+                dadosApp[mesId][chaveItens] = itensValidos;
+            });
+        }
+
         function construirGavetaParaMes(mesId) {
             let gaveta = JSON.parse(JSON.stringify(configFixosPadrao));
             parceladosApp.forEach(p => {
                 let dest = (p.destino || '').toLowerCase();
                 if(dest.includes('gaveta') || dest.includes('boleto')) {
                     if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
-                        let descGaveta = `[Conta] ${p.desc}`;
-                        if (!gaveta.some(g => g.desc === descGaveta)) {
-                            gaveta.push({ desc: descGaveta, valor: p.valor, tipo: 'saida', pago: false });
-                        }
+                        gaveta.push({ desc: `[Conta] ${p.desc}`, valor: p.valor, tipo: 'saida', pago: false });
                     }
                 }
             });
             return gaveta;
-        }
-
-        function sincronizarItensCartaoParaMes(mesId, cartaoNome) {
-            let chaveItens = `itens${cartaoNome}`;
-            if (!dadosApp[mesId][chaveItens]) {
-                dadosApp[mesId][chaveItens] = [];
-            }
-            let itens = dadosApp[mesId][chaveItens];
-            let nomeCartaoBusca = cartaoNome.toLowerCase().replace('cartão', '').trim();
-
-            configOrcamentos.forEach(o => {
-                let cartaoOrc = (o.cartao || '').toLowerCase().replace('cartão', '').trim();
-                if (cartaoOrc === nomeCartaoBusca) {
-                    if ((!o.inicio || mesId >= o.inicio) && (!o.fim || mesId <= o.fim)) {
-                        if (!itens.some(i => i.desc === o.desc)) {
-                            itens.push({ id: Date.now() + Math.random(), desc: o.desc, orcado: o.valor, real: o.valor });
-                        }
-                    }
-                }
-            });
-
-            parceladosApp.forEach(p => {
-                let dest = (p.destino || '').toLowerCase().replace('cartão', '').trim();
-                if (dest === nomeCartaoBusca) {
-                    if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
-                        let descParcela = `[Parcela] ${p.desc}`;
-                        if (!itens.some(i => i.desc === descParcela)) {
-                            itens.push({ id: Date.now() + Math.random(), desc: descParcela, orcado: p.valor, real: p.valor });
-                        }
-                    }
-                }
-            });
         }
 
         function atualizarSeletorMeses() {
@@ -676,9 +680,7 @@
         function calcularTetosDinamicos() {
             const data = dadosApp[mesAtual];
             if(!data) return;
-            configCartoes.forEach(c => {
-                sincronizarItensCartaoParaMes(mesAtual, c.nome);
-            });
+            sincronizarMesCompleto(mesAtual);
             sincronizarFaturasNasSemanas();
             document.getElementById('lblMesCartoes').innerText = data.nomeExibicao;
             const grid = document.getElementById('gridCartoesDinamicos');
@@ -885,7 +887,7 @@
                 gaveta: construirGavetaParaMes(id),
                 semanas: [{periodo:"01 a 07", nome:"1ª", itens:[]}, {periodo:"08 a 15", nome:"2ª", itens:[]}, {periodo:"16 a 22", nome:"3ª", itens:[]}, {periodo:"23 a 30", nome:"4ª", itens:[]}]
             };
-            configCartoes.forEach(c => { sincronizarItensCartaoParaMes(id, c.nome); });
+            sincronizarMesCompleto(id);
             mesAtual = id; fecharModalNovoMes(); salvarTudo();
         }
 
@@ -918,8 +920,15 @@
         function renderizarParcelados() {
             const tbody = document.getElementById('tabelaParcelados'); tbody.innerHTML = '';
             parceladosApp.forEach(p => {
-                tbody.innerHTML += `<tr class="border-b"><td class="p-2.5">${p.desc}</td><td class="p-2.5">${p.destino}</td><td class="p-2.5">R$ ${p.valor.toFixed(2)}</td><td class="p-2.5">${p.inicio||'-'} → ${p.fim||'-'}</td><td class="p-2.5 text-center"><button onclick="parceladosApp=parceladosApp.filter(x=>x.id!==${p.id});salvarTudo();" class="text-rose-500"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+                tbody.innerHTML += `<tr class="border-b"><td class="p-2.5">${p.desc}</td><td class="p-2.5">${p.destino}</td><td class="p-2.5">R$ ${p.valor.toFixed(2)}</td><td class="p-2.5">${p.inicio||'-'} → ${p.fim||'-'}</td><td class="p-2.5 text-center"><button onclick="excluirParcela(${p.id})" class="text-rose-500"><i class="fa-solid fa-trash"></i></button></td></tr>`;
             });
+        }
+
+        function excluirParcela(id) {
+            if(confirm('Tem certeza que deseja excluir esta parcela/conta? Ela será removida de todos os cartões e meses.')) {
+                parceladosApp = parceladosApp.filter(x => x.id !== id);
+                salvarTudo();
+            }
         }
 
         function renderizarReservas() {
