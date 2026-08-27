@@ -482,6 +482,10 @@
                         { periodo: "23 a 30", nome: "4ª Semana", itens: [] }
                     ]
                 };
+            } else {
+                if(!dadosApp[mesAtual].gaveta) {
+                    dadosApp[mesAtual].gaveta = construirGavetaParaMes(mesAtual);
+                }
             }
 
             atualizarSeletorMeses();
@@ -499,7 +503,6 @@
                         dadosApp[mKey][chaveItens] = gerarItensCartaoParaMes(mKey, c.nome);
                     }
                 });
-                dadosApp[mKey].gaveta = construirGavetaParaMes(mKey);
             }
 
             let pacoteDados = {
@@ -619,17 +622,14 @@
         function allowDrop(ev) { ev.preventDefault(); ev.currentTarget.classList.add('drag-over'); }
         function leaveDrop(ev) { ev.currentTarget.classList.remove('drag-over'); }
         function drop(ev, destinoSemIndex) {
-            ev.preventDefault(); ev.currentTarget.classList.add('drag-over');
+            ev.preventDefault(); ev.currentTarget.classList.remove('drag-over');
             let data = JSON.parse(ev.dataTransfer.getData("text/plain"));
-            
             let itemMovido;
             if (data.origemTipo === 'gaveta') {
-                // Remove definitivamente da gaveta quando arrastado para a semana
                 itemMovido = dadosApp[mesAtual].gaveta.splice(data.itemIndex, 1)[0];
             } else {
                 itemMovido = dadosApp[mesAtual].semanas[data.origemIndex].itens.splice(data.itemIndex, 1)[0];
             }
-            
             dadosApp[mesAtual].semanas[destinoSemIndex].itens.push(itemMovido);
             salvarTudo();
         }
@@ -917,7 +917,7 @@
             });
         }
         function abrirModalNovoQuadroReserva() { document.getElementById('modalNovoQuadroReserva').classList.remove('hidden'); document.getElementById('modalNovoQuadroReserva').classList.add('flex'); }
-        function fecharModalNovoQuadroReserva() { document.getElementById('modalNovoQuadroReserva').classList.remove('hidden'); document.getElementById('modalNovoQuadroReserva').classList.add('hidden'); }
+        function fecharModalNovoQuadroReserva() { document.getElementById('modalNovoQuadroReserva').classList.remove('flex'); document.getElementById('modalNovoQuadroReserva').classList.add('hidden'); }
         function salvarNovoQuadroReserva() {
             let nome = document.getElementById('novoQuadroNome').value; let meta = parseFloat(document.getElementById('novoQuadroMeta').value)||0; let saldo = parseFloat(document.getElementById('novoQuadroSaldo').value)||0;
             if(!nome) return; quadrosReservasApp.push({ id: 'res_'+Date.now(), nome, saldo, meta }); fecharModalNovoQuadroReserva(); salvarTudo();
