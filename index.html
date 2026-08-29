@@ -154,8 +154,8 @@
             <section id="aba-cartoes" class="hidden space-y-6">
                 <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-r-lg flex justify-between items-center flex-wrap gap-3">
                     <div>
-                        <h3 class="font-semibold text-blue-900 text-sm">Fatura de Cartão Paga em <span id="lblMesCartoes">Mês Atual</span></h3>
-                        <p class="text-xs text-blue-800">A fatura paga neste mês corresponde aos gastos feitos no mês anterior (<span id="lblMesAnteriorNome">mês passado</span>).</p>
+                        <h3 class="font-semibold text-blue-900 text-sm">Fatura Paga em <span id="lblMesCartoes">Mês Atual</span></h3>
+                        <p class="text-xs text-blue-800">Esta fatura exibe os gastos digitados no mês anterior (<span id="lblMesAnteriorNome">mês passado</span>).</p>
                     </div>
                     <button onclick="abrirModalTabelaPlanilha()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5">
                         <i class="fa-solid fa-table"></i> Visão Consolidada (Estilo Planilha)
@@ -438,13 +438,13 @@
             return (num || 0).toFixed(2).replace('.', ',');
         }
 
-        function obterMesProximo(mesKey) {
+        function obterMesAnterior(mesKey) {
             if (!mesKey || !mesKey.includes('-')) return mesKey;
             let [ano, mes] = mesKey.split('-').map(Number);
-            mes += 1;
-            if (mes > 12) {
-                mes = 1;
-                ano += 1;
+            mes -= 1;
+            if (mes === 0) {
+                mes = 12;
+                ano -= 1;
             }
             return `${ano}-${String(mes).padStart(2, '0')}`;
         }
@@ -797,10 +797,14 @@
         function garantirFaturasNasSemanas() {
             const data = dadosApp[mesAtual];
             if (!data) return;
+
+            let mesAnteriorId = obterMesAnterior(mesAtual);
+            let dadosMesAnterior = dadosApp[mesAnteriorId];
             
             configCartoes.forEach(cartao => {
                 let chaveItens = `itens${cartao.nome}`;
-                let itensFatura = data[chaveItens] || [];
+                // Puxa os gastos do mês anterior para formar a fatura que vence neste mês
+                let itensFatura = dadosMesAnterior && dadosMesAnterior[chaveItens] ? dadosMesAnterior[chaveItens] : [];
                 let totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
                 let nomeItemCard = `Cartão ${cartao.nome}`;
                 let semIdx = Math.min(cartao.semanaTeto, data.semanas.length - 1);
@@ -827,15 +831,13 @@
             if(!data) return;
             sincronizarMesCompleto(mesAtual);
 
+            let mesAnteriorId = obterMesAnterior(mesAtual);
+            let dadosMesAnterior = dadosApp[mesAnteriorId];
+            let nomeMesAntExib = dadosMesAnterior ? dadosMesAnterior.nomeExibicao : "mês anterior";
+            document.getElementById('lblMesAnteriorNome').innerText = nomeMesAntExib;
+
             garantirFaturasNasSemanas();
             document.getElementById('lblMesCartoes').innerText = data.nomeExibicao;
-            
-            // Descobre o nome do mês anterior para exibir na instrução
-            let [anoM, mesM] = mesAtual.split('-').map(Number);
-            mesM -= 1; if(mesM === 0) { mesM = 12; anoM -= 1; }
-            let mesAntKey = `${anoM}-${String(mesM).padStart(2,'0')}`;
-            let nomeMesAntExib = dadosApp[mesAntKey] ? dadosApp[mesAntKey].nomeExibicao : "mês anterior";
-            document.getElementById('lblMesAnteriorNome').innerText = nomeMesAntExib;
 
             const grid = document.getElementById('gridCartoesDinamicos');
             grid.innerHTML = '';
@@ -852,7 +854,8 @@
                 }
                 
                 let chaveItens = `itens${cartao.nome}`;
-                let itensFatura = data[chaveItens] || [];
+                // A fatura exibida no mês atual puxa os gastos lançados no mês anterior
+                let itensFatura = dadosMesAnterior && dadosMesAnterior[chaveItens] ? dadosMesAnterior[chaveItens] : [];
                 let totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
                 let tetoDisponivel = saldoSemanaTeto - totalRealFatura;
                 let corBg = cartao.cor === 'rose' ? 'bg-rose-500' : (cartao.cor === 'emerald' ? 'bg-emerald-600' : (cartao.cor === 'amber' ? 'bg-amber-600' : 'bg-indigo-600'));
@@ -873,7 +876,7 @@
                 grid.innerHTML += `
                     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                         <div class="${corBg} text-white p-4 flex justify-between items-center">
-                            <div><h3 class="font-bold text-base">${cartao.nome}</h3><p class="text-xs opacity-90">Gastos feitos em ${data.nomeExibicao} (Venc. em ${nomeMesAntExib === 'mês anterior' ? 'próximo mês' : 'mês seguinte'})</p></div>
+                            <div><h3 class="font-bold text-base">${cartao.nome}</h3><p class="text-xs opacity-90">Fatura referente aos gastos de ${nomeMesAntExib}</p></div>
                             <span class="bg-black/20 text-xs px-2.5 py-1 rounded-full font-medium">Limite R$ ${formatarMoeda(cartao.limite)}</span>
                         </div>
                         <div class="p-4 space-y-4 flex-1">
@@ -882,7 +885,7 @@
                                 <span class="text-xl font-bold ${corTxt}">R$ ${formatarMoeda(tetoDisponivel)}</span>
                             </div>
                             <div>
-                                <div class="flex justify-between items-center mb-1"><label class="text-xs font-semibold text-slate-700">Gastos de ${data.nomeExibicao}</label><button onclick="abrirModalGastoCartao('${cartao.nome}')" class="text-xs text-indigo-600 font-semibold hover:underline"><i class="fa-solid fa-plus"></i> Adicionar Gasto</button></div>
+                                <div class="flex justify-between items-center mb-1"><label class="text-xs font-semibold text-slate-700">Lançamentos em ${nomeMesAntExib}</label><button onclick="abrirModalGastoCartao('${cartao.nome}')" class="text-xs text-indigo-600 font-semibold hover:underline"><i class="fa-solid fa-plus"></i> Adicionar Gasto em ${nomeMesAntExib}</button></div>
                                 <div class="overflow-x-auto border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
                                     <table class="w-full text-left text-xs"><thead class="bg-slate-100 text-slate-600 uppercase"><tr><th class="p-2">Desc</th><th class="p-2">Orçado</th><th class="p-2">Real</th><th class="p-2 text-center">Ações</th></tr></thead><tbody class="divide-y divide-slate-100">${linhasItens}</tbody></table>
                                 </div>
@@ -913,7 +916,7 @@
                     }).join('');
                     linhasMeses += `<tr><td class="p-2 border font-bold bg-slate-50">${(mData.nomeExibicao||mKey).substring(0,3).toUpperCase()}</td>${celdasCat}<td class="p-2 border text-center font-bold text-indigo-700 bg-slate-50">R$ ${formatarMoeda(totalMes)}</td></tr>`;
                 }
-                container.innerHTML += `<div><h4 class="font-bold text-sm mb-2 uppercase">${cartao.nome}</h4><div class="overflow-x-auto"><table class="w-full text-left text-xs border rounded-lg"><thead class="bg-indigo-600 text-white"><tr><th class="p-2 border">Mês Comp.</th>${cabecalhoCols}<th class="p-2 border text-center">TOTAL</th></tr></thead><tbody class="divide-y">${linhasMeses}</tbody></table></div></div>`;
+                container.innerHTML += `<div><h4 class="font-bold text-sm mb-2 uppercase">${cartao.nome}</h4><div class="overflow-x-auto"><table class="w-full text-left text-xs border rounded-lg"><thead class="bg-indigo-600 text-white"><tr><th class="p-2 border">Mês</th>${cabecalhoCols}<th class="p-2 border text-center">TOTAL</th></tr></thead><tbody class="divide-y">${linhasMeses}</tbody></table></div></div>`;
             });
             document.getElementById('modalTabelaPlanilha').classList.remove('hidden'); document.getElementById('modalTabelaPlanilha').classList.add('flex');
         }
@@ -923,20 +926,39 @@
             document.getElementById('cartaoAlvo').value = cartao; 
             document.getElementById('gastoCartaoIdx').value = itemIdx !== null ? itemIdx : '';
             
-            // Salva diretamente no mês atual que está aberto na tela
+            // Quando estiver na aba de Setembro, ao clicar em "Adicionar Gasto", o sistema permite lançar diretamente para o mês de referência correto (Agosto)
+            let mesAlvoModal = obterMesAnterior(mesAtual);
+            if(!dadosApp[mesAlvoModal]) {
+                let [ano, mes] = mesAlvoModal.split('-').map(Number);
+                let nomesMeses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+                let nomeEx = `${nomesMeses[mes - 1]} ${ano}`;
+                dadosApp[mesAlvoModal] = {
+                    nomeExibicao: nomeEx,
+                    tituloAlerta: `${nomeEx}: Planejamento`,
+                    textoAlerta: "Organize seus gastos.",
+                    gaveta: [],
+                    semanas: [
+                        { periodo: "01 a 07", nome: "1ª Semana", itens: [] },
+                        { periodo: "08 a 15", nome: "2ª Semana", itens: [] },
+                        { periodo: "16 a 22", nome: "3ª Semana", itens: [] },
+                        { periodo: "23 a 30", nome: "4ª Semana", itens: [] }
+                    ]
+                };
+            }
+
             let chaveItens = `itens${cartao}`;
-            if(!dadosApp[mesAtual][chaveItens]) dadosApp[mesAtual][chaveItens] = [];
-            let itens = dadosApp[mesAtual][chaveItens];
-            let nomeMesAtualExib = dadosApp[mesAtual].nomeExibicao;
+            if(!dadosApp[mesAlvoModal][chaveItens]) dadosApp[mesAlvoModal][chaveItens] = [];
+            let itens = dadosApp[mesAlvoModal][chaveItens];
+            let nomeMesAlvoExib = dadosApp[mesAlvoModal].nomeExibicao;
             
             if(itemIdx !== null && itens[itemIdx]) {
                 let item = itens[itemIdx];
-                document.getElementById('tituloModalGastoCartao').innerText = `Editar Gasto (${cartao} - ${nomeMesAtualExib})`;
+                document.getElementById('tituloModalGastoCartao').innerText = `Editar Gasto (${cartao} - Ref: ${nomeMesAlvoExib})`;
                 document.getElementById('gastoDesc').value = item.desc; 
                 document.getElementById('gastoOrcado').value = formatarMoeda(item.orcado || 0); 
                 document.getElementById('gastoReal').value = formatarMoeda(item.real || 0);
             } else {
-                document.getElementById('tituloModalGastoCartao').innerText = `Adicionar Gasto (${cartao} - ${nomeMesAtualExib})`;
+                document.getElementById('tituloModalGastoCartao').innerText = `Adicionar Gasto (${cartao} - Ref: ${nomeMesAlvoExib})`;
                 document.getElementById('gastoDesc').value = ''; 
                 document.getElementById('gastoOrcado').value = ''; 
                 document.getElementById('gastoReal').value = '';
@@ -954,9 +976,10 @@
             const real = parseMoeda(document.getElementById('gastoReal').value);
             if(!desc) return alert('Informe a descrição do gasto.');
             
+            let mesAlvoModal = obterMesAnterior(mesAtual);
             let chaveItens = `itens${cartao}`;
-            if(!dadosApp[mesAtual][chaveItens]) dadosApp[mesAtual][chaveItens] = [];
-            let itens = dadosApp[mesAtual][chaveItens];
+            if(!dadosApp[mesAlvoModal][chaveItens]) dadosApp[mesAlvoModal][chaveItens] = [];
+            let itens = dadosApp[mesAlvoModal][chaveItens];
 
             if(itemIdxStr !== '') {
                 let idx = parseInt(itemIdxStr);
@@ -974,7 +997,8 @@
 
         function excluirGastoCartao(cartao, itemIdx) {
             if(confirm('Tem certeza que deseja excluir este gasto?')) { 
-                dadosApp[mesAtual][`itens${cartao}`].splice(itemIdx, 1); 
+                let mesAlvoModal = obterMesAnterior(mesAtual);
+                dadosApp[mesAlvoModal][`itens${cartao}`].splice(itemIdx, 1); 
                 salvarTudo(); 
             }
         }
