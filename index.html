@@ -13,6 +13,33 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
         .kanban-drop-zone { min-height: 150px; transition: background-color 0.2s; }
         .kanban-drop-zone.drag-over { background-color: #f1f5f9; border: 2px dashed #6366f1; border-radius: 0.5rem; }
+
+        /* Tooltip para itens truncados do Kanban */
+        .financeiro-tooltip {
+            position: relative;
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .financeiro-tooltip[data-tooltip]:hover::after {
+                content: attr(data-tooltip);
+                position: absolute;
+                z-index: 100;
+                left: 0;
+                bottom: calc(100% + 8px);
+                max-width: min(360px, 70vw);
+                width: max-content;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                background: #0f172a;
+                color: #fff;
+                padding: 7px 9px;
+                border-radius: 7px;
+                font-size: 11px;
+                line-height: 1.35;
+                box-shadow: 0 4px 12px rgba(0,0,0,.15);
+                pointer-events: none;
+            }
+        }
+
         @media (max-width: 640px) {
             main { padding: 0.75rem; }
             nav .tab-btn { min-width: 118px; flex: 0 0 auto; white-space: nowrap; }
@@ -893,9 +920,24 @@
                 const nomeItemCard = `Cartão ${cartao.nome}`;
 
                 // A fatura automática pertence ao mês atual porque é paga neste mês.
-                // Primeiro remove somente faturas automáticas antigas desse cartão.
+                // Remove a versão automática anterior e também a versão antiga da
+                // aplicação que podia ter sido salva sem a flag _faturaAutomatica.
+                // Se a versão antiga estava marcada como paga, preservamos esse estado.
+                let faturaAntigaPaga = false;
                 data.semanas.forEach(s => {
-                    s.itens = (s.itens || []).filter(it => !it._faturaAutomatica || it.cartaoNome !== cartao.nome);
+                    const itens = s.itens || [];
+                    itens.forEach(it => {
+                        const ehFaturaDesteCartao =
+                            it.cartaoNome === cartao.nome ||
+                            it.desc === `${nomeItemCard} (Fatura)`;
+                        if (ehFaturaDesteCartao && it.desc === `${nomeItemCard} (Fatura)` && it.pago) {
+                            faturaAntigaPaga = true;
+                        }
+                    });
+                    s.itens = itens.filter(it =>
+                        !(it.cartaoNome === cartao.nome && it._faturaAutomatica) &&
+                        it.desc !== `${nomeItemCard} (Fatura)`
+                    );
                 });
 
                 const semIdx = Math.min(cartao.semanaTeto, data.semanas.length - 1);
@@ -904,13 +946,15 @@
                     const totalPago = obterTotalPagoFatura(mesAnteriorId, cartao.nome);
                     const restante = Math.max(0, totalRealFatura - totalPago);
 
-                    // Só a parte ainda não paga entra como saída no Kanban.
-                    if (restante > 0) {
+                    // Existe uma única representação da fatura no Kanban.
+                    // Se ela já estiver paga, mantemos o item como histórico, sem
+                    // criar uma segunda saída.
+                    if (restante > 0 || faturaAntigaPaga) {
                         data.semanas[semIdx].itens.push({
                             desc: `${nomeItemCard} (Fatura)`,
-                            valor: restante,
+                            valor: restante > 0 ? restante : totalRealFatura,
                             tipo: 'saida',
-                            pago: totalPago >= totalRealFatura,
+                            pago: faturaAntigaPaga || totalPago >= totalRealFatura,
                             _faturaAutomatica: true,
                             cartaoNome: cartao.nome,
                             faturaMes: mesAnteriorId
@@ -1422,7 +1466,7 @@
             document.getElementById('contadorGaveta').innerText = data.gaveta.length;
             const listaGaveta = document.getElementById('listaGaveta');
             listaGaveta.innerHTML = data.gaveta.map((item, itemIdx) => `
-                <li draggable="true" ondragstart="drag(event, 'gaveta', -1, ${itemIdx})" class="py-2 px-2 bg-white rounded border shadow-sm flex items-center justify-between text-xs gap-2 cursor-grab">
+                <li draggable="true" ondragstart="drag(event, 'gaveta', -1, ${itemIdx})" class="financeiro-tooltip py-2 px-2 bg-white rounded border shadow-sm flex items-center justify-between text-xs gap-2 cursor-grab" data-tooltip="${String(item.desc || '').replace(/"/g, '&quot;')} — R$ ${formatarMoeda(item.valor)}" title="${String(item.desc || '').replace(/"/g, '&quot;')} — R$ ${formatarMoeda(item.valor)}">
                     <span class="truncate font-medium">${item.desc}</span>
                     <div class="flex items-center gap-1.5 whitespace-nowrap">
                         <span class="font-semibold ${item.tipo === 'entra' ? 'text-emerald-600' : ''}">${item.tipo === 'entra'?'+':''}R$ ${formatarMoeda(item.valor)}</span>
@@ -1443,7 +1487,7 @@
                     if(item.tipo === 'entra' || item.tipo === 'resgate') entraSemana += val;
                     else if(item.tipo === 'saida' || item.tipo === 'aplicacao') saidaSemana += val;
                     return `
-                        <li draggable="true" ondragstart="drag(event, 'semana', ${semIdx}, ${itemIdx})" class="py-2 px-2 bg-white rounded border shadow-sm flex items-center justify-between text-xs gap-2 cursor-grab">
+                        <li draggable="true" ondragstart="drag(event, 'semana', ${semIdx}, ${itemIdx})" class="financeiro-tooltip py-2 px-2 bg-white rounded border shadow-sm flex items-center justify-between text-xs gap-2 cursor-grab" data-tooltip="${String(item.desc || '').replace(/"/g, '&quot;')} — R$ ${formatarMoeda(val)}" title="${String(item.desc || '').replace(/"/g, '&quot;')} — R$ ${formatarMoeda(val)}">
                             <div class="flex items-center gap-2 overflow-hidden">
                                 <input type="checkbox" ${item.pago ? 'checked' : ''} onchange="alternarPago(${semIdx}, ${itemIdx})" class="rounded text-indigo-600 cursor-pointer">
                                 <span class="${item.pago ? 'line-through text-slate-400' : ''} truncate font-medium">${item.desc}</span>
