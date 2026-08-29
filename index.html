@@ -124,7 +124,7 @@
 
                 <div class="flex justify-between items-center">
                     <button onclick="restaurarGavetaPadrao()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition-colors">
-                        <i class="fa-solid fa-rotate-right"></i> Restaurar Fixos na Gaveta
+                        <i class="fa-solid fa-rotate-right"></i> Sincronizar Gaveta com Parcelas
                     </button>
                     <button onclick="abrirModalSemanaExtra()" class="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition-colors">
                         <i class="fa-solid fa-calendar-plus"></i> + Adicionar Semana Extra
@@ -265,7 +265,7 @@
             <h3 class="font-bold text-slate-800 text-lg" id="tituloModalTransacao">Adicionar Conta / Transação</h3>
             <input type="hidden" id="transacaoSemanaIdx"><input type="hidden" id="transacaoItemIdx">
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Nome / Descrição</label><input type="text" id="transacaoDesc" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none"></div>
-            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Valor (R$)</label><input type="number" step="0.01" id="transacaoValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none"></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Valor (R$)</label><input type="number" step="0.01" id="transacaoValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none" placeholder="0,00"></div>
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Tipo</label>
                 <select id="transacaoTipo" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none" onchange="verificarTipoTransacao(this.value)">
                     <option value="saida">Saída / Conta</option><option value="entra">Entrada</option><option value="aplicacao">Aplicação (Reserva+)</option><option value="resgate">Resgate (Reserva-)</option>
@@ -530,17 +530,51 @@
         function sincronizarMesCompleto(mesId) {
             if (!dadosApp[mesId]) return;
             
+            // Sincronização da Gaveta
+            let gavetaAtual = JSON.parse(JSON.stringify(configFixosPadrao));
+            parceladosApp.forEach(p => {
+                let dest = (p.destino || '').toLowerCase();
+                if(dest.includes('gaveta') || dest.includes('boleto')) {
+                    if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
+                        let descGaveta = `[Conta] ${p.desc}`;
+                        if (!gavetaAtual.some(g => g.desc === descGaveta)) {
+                            gavetaAtual.push({ desc: descGaveta, valor: p.valor, tipo: 'saida', pago: false });
+                        }
+                    }
+                }
+            });
+
             if (!dadosApp[mesId].gaveta) {
-                dadosApp[mesId].gaveta = construirGavetaParaMes(mesId);
+                dadosApp[mesId].gaveta = gavetaAtual;
+            } else {
+                gavetaAtual.forEach(itemPadrao => {
+                    let existeNaGaveta = dadosApp[mesId].gaveta.some(g => g.desc === itemPadrao.desc);
+                    let existeNasSemanas = dadosApp[mesId].semanas.some(sem => sem.itens.some(i => i.desc === itemPadrao.desc));
+                    if (!existeNaGaveta && !existeNasSemanas) {
+                        dadosApp[mesId].gaveta.push(itemPadrao);
+                    }
+                });
             }
 
-            // Sincronização robusta de Cartões e Parcelas com vigência corrigida (ex: >= mesId)
+            // Sincronização inteligente dos Cartões (Preservando Gastos Avulsos Manuais)
             configCartoes.forEach(cartao => {
                 let chaveItens = `itens${cartao.nome}`;
                 let itensExistentes = dadosApp[mesId][chaveItens] || [];
                 let itensValidos = [];
                 let nomeCartaoBusca = cartao.nome.toLowerCase().replace('cartão', '').trim();
 
+                // 1. Mantém os gastos avulsos adicionados manualmente pelo usuário (que não estão no admin)
+                itensExistentes.forEach(itemAntigo => {
+                    let isOrcamentoAdmin = configOrcamentos.some(o => (o.cartao || '').toLowerCase().replace('cartão','').trim() === nomeCartaoBusca && o.desc === itemAntigo.desc);
+                    let isParcelaAdmin = parceladosApp.some(p => (p.destino || '').toLowerCase().replace('cartão','').trim() === nomeCartaoBusca && `[Parcela] ${p.desc}` === itemAntigo.desc);
+                    
+                    if (!isOrcamentoAdmin && !isParcelaAdmin) {
+                        // É um gasto avulso manual! Mantém intacto
+                        itensValidos.push(itemAntigo);
+                    }
+                });
+
+                // 2. Adiciona/Atualiza os orçamentos oficiais do admin
                 configOrcamentos.forEach(o => {
                     let cartaoOrc = (o.cartao || '').toLowerCase().replace('cartão', '').trim();
                     if (cartaoOrc === nomeCartaoBusca) {
@@ -552,6 +586,7 @@
                     }
                 });
 
+                // 3. Adiciona/Atualiza as parcelas do cartão
                 parceladosApp.forEach(p => {
                     let dest = (p.destino || '').toLowerCase().replace('cartão', '').trim();
                     if (dest === nomeCartaoBusca) {
@@ -568,27 +603,19 @@
             });
         }
 
-        function construirGavetaParaMes(mesId) {
-            let gaveta = JSON.parse(JSON.stringify(configFixosPadrao));
+        function restaurarGavetaPadrao() {
+            dadosApp[mesAtual].gaveta = [];
+            let gavetaAtual = JSON.parse(JSON.stringify(configFixosPadrao));
             parceladosApp.forEach(p => {
                 let dest = (p.destino || '').toLowerCase();
                 if(dest.includes('gaveta') || dest.includes('boleto')) {
                     if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
-                        let descGaveta = `[Conta] ${p.desc}`;
-                        if (!gaveta.some(g => g.desc === descGaveta)) {
-                            gaveta.push({ desc: descGaveta, valor: p.valor, tipo: 'saida', pago: false });
-                        }
+                        gavetaAtual.push({ desc: `[Conta] ${p.desc}`, valor: p.valor, tipo: 'saida', pago: false });
                     }
                 }
             });
-            return gaveta;
-        }
-
-        function restaurarGavetaPadrao() {
-            if(confirm('Deseja restaurar os itens fixos e contas na gaveta deste mês?')) {
-                dadosApp[mesAtual].gaveta = construirGavetaParaMes(mesAtual);
-                salvarTudo();
-            }
+            dadosApp[mesAtual].gaveta = gavetaAtual;
+            salvarTudo();
         }
 
         function atualizarSeletorMeses() {
@@ -691,7 +718,6 @@
                 if (!existeFaturaEmAlgumaSemana && data.semanas[semIdx] && totalRealFatura > 0) {
                     data.semanas[semIdx].itens.push({ desc: `${nomeItemCard} (Fatura)`, valor: totalRealFatura, tipo: 'saida', pago: false });
                 } else if (existeFaturaEmAlgumaSemana && totalRealFatura > 0) {
-                    // Atualiza o valor caso tenha mudado nos gastos avulsos
                     data.semanas.forEach(s => {
                         s.itens.forEach(it => {
                             if (it.desc.startsWith(nomeItemCard)) it.valor = totalRealFatura;
@@ -715,9 +741,9 @@
                 let semIdx = cartao.semanaTeto;
                 if(data.semanas[semIdx]) {
                     (data.semanas[semIdx].itens || []).forEach(it => {
-                        if(it.tipo === 'entra' || it.tipo === 'resgate') saldoSemanaTeto += it.valor;
-                        else if(it.tipo === 'saida' && !it.desc.startsWith(`Cartão ${cartao.nome}`)) saldoSemanaTeto -= it.valor;
-                        else if(it.tipo === 'aplicacao') saldoSemanaTeto -= it.valor;
+                        if(it.tipo === 'entra' || it.tipo === 'resgate') saldoSemanaTeto += (it.valor || 0);
+                        else if(it.tipo === 'saida' && !it.desc.startsWith(`Cartão ${cartao.nome}`)) saldoSemanaTeto -= (it.valor || 0);
+                        else if(it.tipo === 'aplicacao') saldoSemanaTeto -= (it.valor || 0);
                     });
                 }
                 let chaveItens = `itens${cartao.nome}`;
@@ -931,7 +957,7 @@
             if(!id || !nome) return;
             dadosApp[id] = {
                 nomeExibicao: nome, tituloAlerta: `${nome}: Planejamento`, textoAlerta: "Organize seus gastos.",
-                gaveta: construirGavetaParaMes(id),
+                gaveta: [],
                 semanas: [{periodo:"01 a 07", nome:"1ª", itens:[]}, {periodo:"08 a 15", nome:"2ª", itens:[]}, {periodo:"16 a 22", nome:"3ª", itens:[]}, {periodo:"23 a 30", nome:"4ª", itens:[]}]
             };
             sincronizarMesCompleto(id);
@@ -1008,7 +1034,7 @@
                     <tr class="border-b hover:bg-slate-50">
                         <td class="p-2.5 font-medium text-slate-800">${p.desc}</td>
                         <td class="p-2.5 text-slate-600">${p.destino}</td>
-                        <td class="p-2.5 font-semibold text-slate-800">R$ ${p.valor.toFixed(2).replace('.', ',')}</td>
+                        <td class="p-2.5 font-semibold text-slate-800">R$ ${(p.valor || 0).toFixed(2).replace('.', ',')}</td>
                         <td class="p-2.5 text-slate-500">${validadeTxt}</td>
                         <td class="p-2.5 text-center">
                             <button onclick="abrirModalParcelado(${p.id})" class="text-slate-400 hover:text-indigo-600 px-1.5" title="Editar"><i class="fa-solid fa-pen text-xs"></i></button>
@@ -1031,7 +1057,7 @@
             if(quadrosReservasApp.length === 0) { grid.innerHTML = `<div class="col-span-2 text-center py-8 text-slate-400 text-xs">Nenhum quadro de reserva.</div>`; return; }
             quadrosReservasApp.forEach(q => {
                 let meta = q.meta > 0 ? q.meta : 1; let perc = Math.min(100, (q.saldo / meta) * 100);
-                grid.innerHTML += `<div class="bg-white p-4 rounded-xl border shadow-sm space-y-3"><div class="flex justify-between items-center"><h4 class="font-bold text-sm">${q.nome}</h4><div class="flex gap-1"><button onclick="abrirModalMovQuadro('${q.id}','deposito')" class="bg-emerald-600 text-white text-[10px] px-2 py-1 rounded">+ Depósito</button><button onclick="abrirModalMovQuadro('${q.id}','retirada')" class="bg-rose-600 text-white text-[10px] px-2 py-1 rounded">- Retirada</button><button onclick="quadrosReservasApp=quadrosReservasApp.filter(x=>x.id!='${q.id}');salvarTudo();" class="text-rose-500 px-1 text-xs"><i class="fa-solid fa-trash"></i></button></div></div><div class="flex justify-between items-end"><div><span class="text-[10px] text-slate-400 block uppercase font-bold">Saldo</span><span class="text-xl font-extrabold text-indigo-900">R$ ${q.saldo.toFixed(2)}</span></div><span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">Meta: R$ ${q.meta.toFixed(2)} (${perc.toFixed(1)}%)</span></div><div class="w-full bg-slate-100 rounded-full h-2.5"><div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${perc}%"></div></div></div>`;
+                grid.innerHTML += `<div class="bg-white p-4 rounded-xl border shadow-sm space-y-3"><div class="flex justify-between items-center"><h4 class="font-bold text-sm">${q.nome}</h4><div class="flex gap-1"><button onclick="abrirModalMovQuadro('${q.id}','deposito')" class="bg-emerald-600 text-white text-[10px] px-2 py-1 rounded">+ Depósito</button><button onclick="abrirModalMovQuadro('${q.id}','retirada')" class="bg-rose-600 text-white text-[10px] px-2 py-1 rounded">- Retirada</button><button onclick="quadrosReservasApp=quadrosReservasApp.filter(x=>x.id!='${q.id}');salvarTudo();" class="text-rose-500 px-1 text-xs"><i class="fa-solid fa-trash"></i></button></div></div><div class="flex justify-between items-end"><div><span class="text-[10px] text-slate-400 block uppercase font-bold">Saldo</span><span class="text-xl font-extrabold text-indigo-900">R$ ${(q.saldo || 0).toFixed(2).replace('.', ',')}</span></div><span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">Meta: R$ ${(q.meta || 0).toFixed(2).replace('.', ',')} (${perc.toFixed(1)}%)</span></div><div class="w-full bg-slate-100 rounded-full h-2.5"><div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${perc}%"></div></div></div>`;
             });
         }
         function abrirModalNovoQuadroReserva() { document.getElementById('modalNovoQuadroReserva').classList.remove('hidden'); document.getElementById('modalNovoQuadroReserva').classList.add('flex'); }
@@ -1057,11 +1083,11 @@
 
         function renderizarAdmin() {
             const tbFixos = document.getElementById('tabelaAdminFixos'); tbFixos.innerHTML = '';
-            configFixosPadrao.forEach((item, idx) => { tbFixos.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2">${item.desc}</td><td class="p-2 font-semibold">R$ ${item.valor.toFixed(2)}</td><td class="p-2 text-center"><button onclick="configFixosPadrao.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
+            configFixosPadrao.forEach((item, idx) => { tbFixos.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2">${item.desc}</td><td class="p-2 font-semibold">R$ ${(item.valor || 0).toFixed(2).replace('.', ',')}</td><td class="p-2 text-center"><button onclick="configFixosPadrao.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
             const tbOrc = document.getElementById('tabelaAdminOrcamentos'); tbOrc.innerHTML = '';
-            configOrcamentos.forEach((o, idx) => { tbOrc.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2"><b>${o.desc}</b> (${o.cartao}): R$ ${o.valor.toFixed(2)}</td><td class="p-2 text-center"><button onclick="configOrcamentos.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
+            configOrcamentos.forEach((o, idx) => { tbOrc.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2"><b>${o.desc}</b> (${o.cartao}): R$ ${(o.valor || 0).toFixed(2).replace('.', ',')}</td><td class="p-2 text-center"><button onclick="configOrcamentos.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
             const tbCartoes = document.getElementById('tabelaAdminCartoes'); tbCartoes.innerHTML = '';
-            configCartoes.forEach((c, idx) => { tbCartoes.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2">${c.nome} (Lim: R$ ${c.limite.toFixed(2)})</td><td class="p-2 text-center"><button onclick="configCartoes.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
+            configCartoes.forEach((c, idx) => { tbCartoes.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2">${c.nome} (Lim: R$ ${(c.limite || 0).toFixed(2).replace('.', ',')})</td><td class="p-2 text-center"><button onclick="configCartoes.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
         }
         function abrirModalAdminItem() { document.getElementById('modalAdminItem').classList.remove('hidden'); document.getElementById('modalAdminItem').classList.add('flex'); }
         function fecharModalAdminItem() { document.getElementById('modalAdminItem').classList.remove('hidden'); document.getElementById('modalAdminItem').classList.add('hidden'); }
@@ -1096,7 +1122,7 @@
                 <li draggable="true" ondragstart="drag(event, 'gaveta', -1, ${itemIdx})" class="py-2 px-2 bg-white rounded border shadow-sm flex items-center justify-between text-xs gap-2 cursor-grab">
                     <span class="truncate font-medium">${item.desc}</span>
                     <div class="flex items-center gap-1.5 whitespace-nowrap">
-                        <span class="font-semibold ${item.tipo === 'entra' ? 'text-emerald-600' : ''}">${item.tipo === 'entra'?'+':''}R$ ${(item.valor || 0).toFixed(2)}</span>
+                        <span class="font-semibold ${item.tipo === 'entra' ? 'text-emerald-600' : ''}">${item.tipo === 'entra'?'+':''}R$ ${(item.valor || 0).toFixed(2).replace('.', ',')}</span>
                         <button onclick="abrirModalTransacao(-1, ${itemIdx})" class="text-slate-400 hover:text-indigo-600 px-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
                         <button onclick="excluirTransacao(-1, ${itemIdx})" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-[10px]"></i></button>
                     </div>
@@ -1104,7 +1130,7 @@
             `).join('');
 
             let totalEntradas = 0, totalSaidas = 0;
-            let saldoAcumuladoCascata = 0; // Saldo que transborda em cascata para a semana seguinte
+            let saldoAcumuladoCascata = 0; 
             const gridSemanas = document.getElementById('gridSemanas'); gridSemanas.innerHTML = '';
             
             data.semanas.forEach((sem, semIdx) => {
@@ -1120,7 +1146,7 @@
                                 <span class="${item.pago ? 'line-through text-slate-400' : ''} truncate font-medium">${item.desc}</span>
                             </div>
                             <div class="flex items-center gap-1.5 whitespace-nowrap">
-                                <span class="font-semibold ${item.tipo === 'entra'||item.tipo==='resgate'?'text-emerald-600':''}">${item.tipo==='entra'||item.tipo==='resgate'?'+':''}R$ ${val.toFixed(2)}</span>
+                                <span class="font-semibold ${item.tipo === 'entra'||item.tipo==='resgate'?'text-emerald-600':''}">${item.tipo==='entra'||item.tipo==='resgate'?'+':''}R$ ${val.toFixed(2).replace('.', ',')}</span>
                                 <button onclick="abrirModalTransacao(${semIdx}, ${itemIdx})" class="text-slate-400 hover:text-indigo-600 px-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
                                 <button onclick="excluirTransacao(${semIdx}, ${itemIdx})" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-[10px]"></i></button>
                             </div>
@@ -1131,15 +1157,14 @@
                 totalEntradas += entraSemana; 
                 totalSaidas += saidaSemana; 
                 
-                // Saldo da semana atual somado ao saldo acumulado da semana anterior (efeito cascata)
                 let sobraSemana = (entraSemana - saidaSemana) + saldoAcumuladoCascata;
-                saldoAcumuladoCascata = sobraSemana; // O saldo final vira o acumulado para a próxima
+                saldoAcumuladoCascata = sobraSemana; 
 
                 gridSemanas.innerHTML += `
                     <div class="bg-white rounded-xl border shadow-sm overflow-hidden flex flex-col">
                         <div class="bg-slate-100 p-3 border-b flex justify-between items-center">
                             <div><span class="text-[10px] uppercase font-bold text-slate-500">Semana ${semIdx + 1}</span><h4 class="text-xs font-bold">${sem.periodo}</h4></div>
-                            <div class="text-right"><span class="text-[10px] text-slate-400 block">Sobra Acumulada</span><span class="text-xs font-bold ${sobraSemana>=0?'text-emerald-600':'text-rose-600'}">R$ ${sobraSemana.toFixed(2)}</span></div>
+                            <div class="text-right"><span class="text-[10px] text-slate-400 block">Sobra Acumulada</span><span class="text-xs font-bold ${sobraSemana>=0?'text-emerald-600':'text-rose-600'}">R$ ${sobraSemana.toFixed(2).replace('.', ',')}</span></div>
                         </div>
                         <div class="p-3 flex-1 flex flex-col justify-between kanban-drop-zone" ondragover="allowDrop(event)" ondragleave="leaveDrop(event)" ondrop="drop(event, ${semIdx})">
                             <ul class="space-y-2 max-h-56 overflow-y-auto pr-1">${itensHtml}</ul>
@@ -1149,9 +1174,9 @@
                 `;
             });
 
-            document.getElementById('resumoEntradas').innerText = `R$ ${totalEntradas.toFixed(2)}`;
-            document.getElementById('resumoSaidas').innerText = `R$ ${totalSaidas.toFixed(2)}`;
-            document.getElementById('resumoSobra').innerText = `R$ ${(totalEntradas - totalSaidas).toFixed(2)}`;
+            document.getElementById('resumoEntradas').innerText = `R$ ${totalEntradas.toFixed(2).replace('.', ',')}`;
+            document.getElementById('resumoSaidas').innerText = `R$ ${totalSaidas.toFixed(2).replace('.', ',')}`;
+            document.getElementById('resumoSobra').innerText = `R$ ${(totalEntradas - totalSaidas).toFixed(2).replace('.', ',')}`;
         }
     </script>
 </body>
