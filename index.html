@@ -17,6 +17,7 @@
         /* Tooltip para itens truncados do Kanban */
         .financeiro-tooltip {
             position: relative;
+            touch-action: manipulation;
         }
         @media (hover: hover) and (pointer: fine) {
             .financeiro-tooltip[data-tooltip]:hover::after {
@@ -866,25 +867,64 @@
             const valorAtual = calcularFaturaMes(mesFaturaId, {nome: cartaoNome});
             if (valorAtual <= 0) return alert('Não há valor de fatura para registrar.');
 
-            const valorStr = prompt(`Valor pago da fatura ${cartaoNome}:`, formatarMoeda(valorAtual));
+            const valorStr = prompt(
+                `Valor pago da fatura ${cartaoNome}:`,
+                formatarMoeda(valorAtual)
+            );
             if (valorStr === null) return;
-            const valor = parseMoeda(valorStr);
-            if (!valor || valor <= 0) return alert('Informe um valor válido.');
 
-            const dataStr = prompt('Data do pagamento (AAAA-MM-DD):', `${mesPagamento}-01`);
+            const valor = parseMoeda(valorStr);
+            if (!valor || valor <= 0) {
+                return alert('Informe um valor válido.');
+            }
+
+            // A interface usa DD/MM/AAAA. Internamente mantemos AAAA-MM-DD
+            // para facilitar ordenação e compatibilidade com os dados existentes.
+            const partesMesAtual = mesAtual.split('-').map(Number);
+            const hoje = new Date();
+            const diaPadrao = hoje.getFullYear() === partesMesAtual[0] && hoje.getMonth() + 1 === partesMesAtual[1]
+                ? hoje.getDate()
+                : 1;
+            const dataPadrao = `${String(diaPadrao).padStart(2, '0')}/${String(partesMesAtual[1]).padStart(2, '0')}/${partesMesAtual[0]}`;
+
+            const dataStr = prompt(
+                'Data do pagamento (DD/MM/AAAA):',
+                dataPadrao
+            );
             if (dataStr === null) return;
-            if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dataStr)) return alert('Use o formato AAAA-MM-DD.');
+
+            const match = dataStr.trim().match(/^(\\d{2})\\/(\\d{2})\\/(\\d{4})$/);
+            if (!match) {
+                return alert('Use o formato DD/MM/AAAA.');
+            }
+
+            const dia = Number(match[1]);
+            const mes = Number(match[2]);
+            const ano = Number(match[3]);
+            const dataObj = new Date(ano, mes - 1, dia);
+
+            if (
+                dataObj.getFullYear() !== ano ||
+                dataObj.getMonth() !== mes - 1 ||
+                dataObj.getDate() !== dia
+            ) {
+                return alert('Informe uma data válida no formato DD/MM/AAAA.');
+            }
+
+            const dataISO = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
 
             dadosApp[mesPagamento][chave].push({
                 id: Date.now(),
                 faturaMes: mesFaturaId,
                 valor,
-                data: dataStr,
+                data: dataISO,
+                dataExibicao: dataStr.trim(),
                 pagoAntecipado: true
             });
 
             salvarTudo();
         }
+
 
         function obterTotalPagoFatura(mesFaturaId, cartaoNome) {
             let total = 0;
@@ -917,49 +957,87 @@
                     : [];
 
                 const totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
-                const nomeItemCard = `Cartão ${cartao.nome}`;
+                const nomeItemCard = `Cartão ${cartao.nome} (Fatura)`;
 
-                // A fatura automática pertence ao mês atual porque é paga neste mês.
-                // Remove a versão automática anterior e também a versão antiga da
-                // aplicação que podia ter sido salva sem a flag _faturaAutomatica.
-                // Se a versão antiga estava marcada como paga, preservamos esse estado.
-                let faturaAntigaPaga = false;
-                data.semanas.forEach(s => {
-                    const itens = s.itens || [];
-                    itens.forEach(it => {
-                        const ehFaturaDesteCartao =
-                            it.cartaoNome === cartao.nome ||
-                            it.desc === `${nomeItemCard} (Fatura)`;
-                        if (ehFaturaDesteCartao && it.desc === `${nomeItemCard} (Fatura)` && it.pago) {
-                            faturaAntigaPaga = true;
+                /*
+                 * A fatura é um item móvel do Kanban.
+                 * Não podemos apagá-la e recriá-la a cada salvar(), porque isso
+                 * desfaz qualquer arraste feito pela usuária.
+                 *
+                 * Estratégia:
+                 * 1. procura a fatura existente em qualquer semana;
+                 * 2. se houver mais de uma, mantém apenas uma;
+                 * 3. preserva a semana onde ela foi colocada manualmente;
+                 * 4. se não existir, cria na semana prevista do cartão.
+                 */
+                let faturaExistente = null;
+                let semanaFaturaExistente = -1;
+                let indiceFaturaExistente = -1;
+
+                data.semanas.forEach((sem, semIdx) => {
+                    const itens = sem.itens || [];
+                    for (let idx = 0; idx < itens.length; idx++) {
+                        const it = itens[idx];
+                        const ehFatura =
+                            (it._faturaAutomatica && it.cartaoNome === cartao.nome) ||
+                            it.desc === nomeItemCard ||
+                            it.desc === `Cartão ${cartao.nome} (Fatura)`;
+
+                        if (ehFatura) {
+                            if (!faturaExistente) {
+                                faturaExistente = it;
+                                semanaFaturaExistente = semIdx;
+                                indiceFaturaExistente = idx;
+                            } else {
+                                // Remove duplicatas, preservando a primeira encontrada.
+                                itens.splice(idx, 1);
+                                idx--;
+                            }
                         }
-                    });
-                    s.itens = itens.filter(it =>
-                        !(it.cartaoNome === cartao.nome && it._faturaAutomatica) &&
-                        it.desc !== `${nomeItemCard} (Fatura)`
-                    );
+                    }
                 });
 
-                const semIdx = Math.min(cartao.semanaTeto, data.semanas.length - 1);
+                const semIdxPrevista = Math.min(cartao.semanaTeto, data.semanas.length - 1);
 
-                if (totalRealFatura > 0 && data.semanas[semIdx]) {
-                    const totalPago = obterTotalPagoFatura(mesAnteriorId, cartao.nome);
-                    const restante = Math.max(0, totalRealFatura - totalPago);
+                if (totalRealFatura <= 0) {
+                    // Sem fatura, remove qualquer item automático/antigo que tenha sobrado.
+                    data.semanas.forEach(s => {
+                        s.itens = (s.itens || []).filter(it =>
+                            !((it._faturaAutomatica && it.cartaoNome === cartao.nome) ||
+                              it.desc === nomeItemCard)
+                        );
+                    });
+                    return;
+                }
 
-                    // Existe uma única representação da fatura no Kanban.
-                    // Se ela já estiver paga, mantemos o item como histórico, sem
-                    // criar uma segunda saída.
-                    if (restante > 0 || faturaAntigaPaga) {
-                        data.semanas[semIdx].itens.push({
-                            desc: `${nomeItemCard} (Fatura)`,
-                            valor: restante > 0 ? restante : totalRealFatura,
-                            tipo: 'saida',
-                            pago: faturaAntigaPaga || totalPago >= totalRealFatura,
-                            _faturaAutomatica: true,
-                            cartaoNome: cartao.nome,
-                            faturaMes: mesAnteriorId
-                        });
+                const totalPago = obterTotalPagoFatura(mesAnteriorId, cartao.nome);
+                const restante = Math.max(0, totalRealFatura - totalPago);
+
+                if (!faturaExistente) {
+                    faturaExistente = {
+                        id: Date.now() + Math.random(),
+                        desc: nomeItemCard,
+                        valor: restante > 0 ? restante : totalRealFatura,
+                        tipo: 'saida',
+                        pago: totalPago >= totalRealFatura,
+                        _faturaAutomatica: true,
+                        cartaoNome: cartao.nome,
+                        faturaMes: mesAnteriorId
+                    };
+
+                    if (data.semanas[semIdxPrevista]) {
+                        data.semanas[semIdxPrevista].itens.push(faturaExistente);
                     }
+                } else {
+                    // Mantém exatamente a semana atual da fatura (inclusive se a usuária
+                    // acabou de arrastá-la), apenas atualizando seus dados financeiros.
+                    faturaExistente.desc = nomeItemCard;
+                    faturaExistente.valor = restante > 0 ? restante : totalRealFatura;
+                    faturaExistente.tipo = 'saida';
+                    faturaExistente.pago = totalPago >= totalRealFatura || faturaExistente.pago === true;
+                    faturaExistente._faturaAutomatica = true;
+                    faturaExistente.cartaoNome = cartao.nome;
+                    faturaExistente.faturaMes = mesAnteriorId;
                 }
             });
         }
