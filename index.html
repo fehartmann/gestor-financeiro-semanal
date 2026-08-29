@@ -1184,28 +1184,32 @@
                     ? Math.min(cartao.semanaTeto, dataProximoMes.semanas.length - 1)
                     : -1;
 
-                // Capacidade financeira da semana de pagamento no próximo mês,
-                // antes da fatura que será formada pelos compromissos deste mês.
-                let capacidadeSemana = 0;
+                // O teto usa a SOBRA ACUMULADA até a semana em que a fatura
+                // será paga. Assim, considera todo o dinheiro que entrou e saiu
+                // desde o início do mês seguinte, e não apenas os movimentos
+                // isolados da semana da fatura.
+                let capacidadeAcumulada = 0;
 
-                if (dataProximoMes && dataProximoMes.semanas[semIdx]) {
-                    (dataProximoMes.semanas[semIdx].itens || []).forEach(it => {
-                        // A fatura do cartão atual não entra aqui: ela é calculada
-                        // pelos compromissos do mês atual e já está representada em
-                        // totalComprometidoMes.
-                        if (it.desc.startsWith(`Cartão ${cartao.nome}`)) return;
+                if (dataProximoMes && semIdx >= 0) {
+                    for (let s = 0; s <= semIdx; s++) {
+                        (dataProximoMes.semanas[s].itens || []).forEach(it => {
+                            // A fatura deste cartão é calculada pelos compromissos
+                            // do mês atual e entra uma única vez abaixo.
+                            if (it.desc.startsWith(`Cartão ${cartao.nome}`)) return;
 
-                        if(it.tipo === 'entra' || it.tipo === 'resgate') {
-                            capacidadeSemana += (it.valor || 0);
-                        } else if(it.tipo === 'saida' || it.tipo === 'aplicacao') {
-                            capacidadeSemana -= (it.valor || 0);
-                        }
-                    });
+                            if (it.tipo === 'entra' || it.tipo === 'resgate') {
+                                capacidadeAcumulada += (it.valor || 0);
+                            } else if (it.tipo === 'saida' || it.tipo === 'aplicacao') {
+                                capacidadeAcumulada -= (it.valor || 0);
+                            }
+                        });
+                    }
                 }
 
-                // O teto restante é a capacidade da semana de pagamento menos
-                // tudo que já está comprometido no cartão neste mês.
-                const tetoDisponivel = capacidadeSemana - totalComprometidoMes;
+                // O teto de novos compromissos no mês atual é o dinheiro disponível
+                // acumulado até a semana de pagamento da fatura, descontando a
+                // fatura que será formada pelos compromissos já feitos neste mês.
+                const tetoDisponivel = capacidadeAcumulada - totalComprometidoMes;
 
                 // A fatura prevista do próximo mês é exatamente o total comprometido
                 // no cartão no mês atual. Como "real" já representa o compromisso,
@@ -1254,7 +1258,7 @@
                                 <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
                                     <span class="text-[10px] ${corTxt} font-bold block uppercase">Ainda pode gastar</span>
                                     <span class="text-xl font-bold ${corTxt}">R$ ${formatarMoeda(tetoDisponivel)}</span>
-                                    <span class="text-[10px] text-slate-500 block mt-1">${dataProximoMes ? `Semana ${semIdx + 1} de pagamento` : 'Crie o próximo mês para calcular'}</span>
+                                    <span class="text-[10px] text-slate-500 block mt-1">${dataProximoMes ? `Saldo acumulado até a semana ${semIdx + 1}` : 'Crie o próximo mês para calcular'}</span>
                                 </div>
                             </div>
                             <div>
