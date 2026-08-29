@@ -891,6 +891,17 @@
                 // tudo que já está comprometido no cartão neste mês.
                 const tetoDisponivel = capacidadeSemana - totalComprometidoMes;
 
+                // A fatura prevista do próximo mês é exatamente o total comprometido
+                // no cartão no mês atual. Como "real" já representa o compromisso,
+                // este valor é o que será levado ao Kanban do próximo mês.
+                const faturaPrevista = totalComprometidoMes;
+
+                // Total efetivamente lançado no cartão. Mantemos separado do orçamento
+                // para a usuária conseguir enxergar o realizado.
+                const totalRealizado = itensMesAtual.reduce(
+                    (acc, i) => acc + (i.real || 0), 0
+                );
+
                 let corBg = cartao.cor === 'rose' ? 'bg-rose-500' : (cartao.cor === 'emerald' ? 'bg-emerald-600' : (cartao.cor === 'amber' ? 'bg-amber-600' : 'bg-indigo-600'));
                 let corTxt = cartao.cor === 'rose' ? 'text-rose-700' : (cartao.cor === 'emerald' ? 'text-emerald-700' : (cartao.cor === 'amber' ? 'text-amber-700' : 'text-indigo-700'));
 
@@ -913,13 +924,29 @@
                             <span class="bg-black/20 text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap">Limite R$ ${formatarMoeda(cartao.limite)}</span>
                         </div>
                         <div class="p-4 space-y-4 flex-1">
-                            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
-                                <span class="text-[10px] ${corTxt} font-bold block uppercase">Teto Disponível • Semana ${dataProximoMes ? semIdx + 1 : '—'} do próximo mês</span>
-                                <span class="text-xl font-bold ${corTxt}">R$ ${formatarMoeda(tetoDisponivel)}</span>
-                                <span class="text-[10px] text-slate-500 block mt-1">${dataProximoMes ? `Calculado pela semana de pagamento em ${dataProximoMes.nomeExibicao || proximoMesId}` : 'Crie o próximo mês para calcular o teto.'}</span>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100 text-center">
+                                    <span class="text-[10px] text-indigo-700 font-bold block uppercase">Fatura prevista</span>
+                                    <span class="text-lg font-bold text-indigo-700">R$ ${formatarMoeda(faturaPrevista)}</span>
+                                    <span class="text-[10px] text-slate-500 block mt-1">${dataProximoMes ? `Pagamento em ${dataProximoMes.nomeExibicao || proximoMesId}` : 'Próximo mês não criado'}</span>
+                                </div>
+                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+                                    <span class="text-[10px] text-slate-600 font-bold block uppercase">Total comprometido</span>
+                                    <span class="text-lg font-bold text-slate-800">R$ ${formatarMoeda(totalComprometidoMes)}</span>
+                                    <span class="text-[10px] text-slate-500 block mt-1">Gastos + orçamento</span>
+                                </div>
+                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+                                    <span class="text-[10px] ${corTxt} font-bold block uppercase">Ainda pode gastar</span>
+                                    <span class="text-xl font-bold ${corTxt}">R$ ${formatarMoeda(tetoDisponivel)}</span>
+                                    <span class="text-[10px] text-slate-500 block mt-1">${dataProximoMes ? `Semana ${semIdx + 1} de pagamento` : 'Crie o próximo mês para calcular'}</span>
+                                </div>
                             </div>
                             <div>
                                 <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mb-1"><label class="text-xs font-semibold text-slate-700">Lançamentos em ${data.nomeExibicao}</label><button onclick="abrirModalGastoCartao('${cartao.nome}')" class="self-start text-xs text-indigo-600 font-semibold hover:underline whitespace-nowrap"><i class="fa-solid fa-plus"></i> Adicionar Gasto</button></div>
+                                <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mb-2">
+                                    <span><strong class="text-slate-700">Total da fatura:</strong> R$ ${formatarMoeda(faturaPrevista)}</span>
+                                    <span><strong class="text-slate-700">Realizado:</strong> R$ ${formatarMoeda(totalRealizado)}</span>
+                                </div>
                                 <div class="overflow-x-auto border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
                                     <table class="w-full min-w-[520px] text-left text-xs"><thead class="bg-slate-100 text-slate-600 uppercase"><tr><th class="p-2">Desc</th><th class="p-2">Orçado</th><th class="p-2">Real</th><th class="p-2 text-center">Ações</th></tr></thead><tbody class="divide-y divide-slate-100">${linhasItens}</tbody></table>
                                 </div>
