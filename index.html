@@ -155,7 +155,7 @@
                 <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-r-lg flex justify-between items-center flex-wrap gap-3">
                     <div>
                         <h3 class="font-semibold text-blue-900 text-sm">Fatura Paga em <span id="lblMesCartoes">Mês Atual</span></h3>
-                        <p class="text-xs text-blue-800">Esta fatura exibe os gastos digitados no mês anterior (<span id="lblMesAnteriorNome">mês passado</span>).</p>
+                        <p class="text-xs text-blue-800">A fatura e os tetos exibidos aqui correspondem aos gastos feitos no mês anterior (<span id="lblMesAnteriorNome">mês passado</span>).</p>
                     </div>
                     <button onclick="abrirModalTabelaPlanilha()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5">
                         <i class="fa-solid fa-table"></i> Visão Consolidada (Estilo Planilha)
@@ -612,45 +612,37 @@
                 });
             }
 
+            // Sincroniza orçamentos e parcelas de cartão diretamente no mês correspondente
             configCartoes.forEach(cartao => {
                 let chaveItens = `itens${cartao.nome}`;
-                let itensExistentes = dadosApp[mesId][chaveItens] || [];
-                let itensValidos = [];
+                if (!dadosApp[mesId][chaveItens]) dadosApp[mesId][chaveItens] = [];
+                let itensAtuais = dadosApp[mesId][chaveItens];
                 let nomeCartaoBusca = cartao.nome.toLowerCase().replace('cartão', '').trim();
 
-                itensExistentes.forEach(itemAntigo => {
-                    let isOrcamentoAdmin = configOrcamentos.some(o => (o.cartao || '').toLowerCase().replace('cartão','').trim() === nomeCartaoBusca && o.desc === itemAntigo.desc);
-                    let isParcelaAdmin = parceladosApp.some(p => (p.destino || '').toLowerCase().replace('cartão','').trim() === nomeCartaoBusca && `[Parcela] ${p.desc}` === itemAntigo.desc);
-                    
-                    if (!isOrcamentoAdmin && !isParcelaAdmin) {
-                        itensValidos.push(itemAntigo);
-                    }
-                });
-
+                // Garante Orçamentos Admin
                 configOrcamentos.forEach(o => {
                     let cartaoOrc = (o.cartao || '').toLowerCase().replace('cartão', '').trim();
                     if (cartaoOrc === nomeCartaoBusca) {
                         if ((!o.inicio || mesId >= o.inicio) && (!o.fim || mesId <= o.fim)) {
-                            let itemAntigo = itensExistentes.find(x => x.desc === o.desc);
-                            let valReal = itemAntigo ? itemAntigo.real : o.valor;
-                            itensValidos.push({ id: itemAntigo ? itemAntigo.id : (Date.now() + Math.random()), desc: o.desc, orcado: o.valor, real: valReal });
+                            if (!itensAtuais.some(item => item.desc === o.desc)) {
+                                itensAtuais.push({ id: Date.now() + Math.random(), desc: o.desc, orcado: o.valor, real: o.valor });
+                            }
                         }
                     }
                 });
 
+                // Garante Parcelas Admin associadas ao cartão
                 parceladosApp.forEach(p => {
                     let dest = (p.destino || '').toLowerCase().replace('cartão', '').trim();
                     if (dest === nomeCartaoBusca) {
                         if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
                             let descParcela = `[Parcela] ${p.desc}`;
-                            let itemAntigo = itensExistentes.find(x => x.desc === descParcela);
-                            let valReal = itemAntigo ? itemAntigo.real : p.valor;
-                            itensValidos.push({ id: itemAntigo ? itemAntigo.id : (Date.now() + Math.random()), desc: descParcela, orcado: p.valor, real: valReal });
+                            if (!itensAtuais.some(item => item.desc === descParcela)) {
+                                itensAtuais.push({ id: Date.now() + Math.random(), desc: descParcela, orcado: p.valor, real: p.valor });
+                            }
                         }
                     }
                 });
-
-                dadosApp[mesId][chaveItens] = itensValidos;
             });
         }
 
@@ -803,7 +795,7 @@
             
             configCartoes.forEach(cartao => {
                 let chaveItens = `itens${cartao.nome}`;
-                // Puxa os gastos do mês anterior para formar a fatura que vence neste mês
+                // Puxa os gastos do mês anterior para formar a fatura que vence e é paga neste mês
                 let itensFatura = dadosMesAnterior && dadosMesAnterior[chaveItens] ? dadosMesAnterior[chaveItens] : [];
                 let totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
                 let nomeItemCard = `Cartão ${cartao.nome}`;
@@ -854,7 +846,7 @@
                 }
                 
                 let chaveItens = `itens${cartao.nome}`;
-                // A fatura exibida no mês atual puxa os gastos lançados no mês anterior
+                // Exibe na aba de cartões do mês atual os gastos que foram feitos no mês anterior
                 let itensFatura = dadosMesAnterior && dadosMesAnterior[chaveItens] ? dadosMesAnterior[chaveItens] : [];
                 let totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
                 let tetoDisponivel = saldoSemanaTeto - totalRealFatura;
@@ -926,7 +918,7 @@
             document.getElementById('cartaoAlvo').value = cartao; 
             document.getElementById('gastoCartaoIdx').value = itemIdx !== null ? itemIdx : '';
             
-            // Quando estiver na aba de Setembro, ao clicar em "Adicionar Gasto", o sistema permite lançar diretamente para o mês de referência correto (Agosto)
+            // O usuário está na aba do mês atual (ex: Setembro) e quer lançar os gastos que pertencem ao mês anterior (ex: Agosto)
             let mesAlvoModal = obterMesAnterior(mesAtual);
             if(!dadosApp[mesAlvoModal]) {
                 let [ano, mes] = mesAlvoModal.split('-').map(Number);
