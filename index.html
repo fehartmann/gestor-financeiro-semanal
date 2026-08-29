@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22><path fill=%22%234f46e5%22 d=%22M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l384 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32zm64 192c17.7 0 32 14.3 32 16l0 64c0 17.7-14.3 32-32 32l-32 0c-17.7 0-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32l32 0zM432 256c13.3 0 24 10.7 24 24s-10.7 24-24 24l-96 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l96 0z%22/></svg>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestor Financeiro Pro - Login</title>
+    <title>Gestor Financeiro Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
@@ -123,7 +123,7 @@
                 </div>
 
                 <div class="flex justify-between items-center">
-                    <button onclick="restaurarGavetaPadrao()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition-colors" title="Puxa novamente os itens fixos padrão para a gaveta deste mês">
+                    <button onclick="restaurarGavetaPadrao()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition-colors">
                         <i class="fa-solid fa-rotate-right"></i> Restaurar Fixos na Gaveta
                     </button>
                     <button onclick="abrirModalSemanaExtra()" class="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition-colors">
@@ -479,9 +479,9 @@
                 let nomeEx = `${nomesMeses[dataHoje.getMonth()]} ${ano}`;
                 dadosApp[mesAtual] = {
                     nomeExibicao: nomeEx,
-                    tituloAlerta: `${nomeEx}: Planejamento do Zero`,
-                    textoAlerta: "Cadastre seus cartões e itens fixos na aba Configurações.",
-                    gaveta: construirGavetaParaMes(mesAtual),
+                    tituloAlerta: `${nomeEx}: Planejamento`,
+                    textoAlerta: "Organize seus gastos.",
+                    gaveta: [],
                     semanas: [
                         { periodo: "01 a 07", nome: "1ª Semana", itens: [] },
                         { periodo: "08 a 15", nome: "2ª Semana", itens: [] },
@@ -530,12 +530,11 @@
         function sincronizarMesCompleto(mesId) {
             if (!dadosApp[mesId]) return;
             
-            // Se a gaveta ainda não existe para este mês, inicializa com os fixos padrão
             if (!dadosApp[mesId].gaveta) {
                 dadosApp[mesId].gaveta = construirGavetaParaMes(mesId);
             }
 
-            // Sincronização dos Cartões e Faturas
+            // Sincronização robusta de Cartões e Parcelas com vigência corrigida (ex: >= mesId)
             configCartoes.forEach(cartao => {
                 let chaveItens = `itens${cartao.nome}`;
                 let itensExistentes = dadosApp[mesId][chaveItens] || [];
@@ -586,7 +585,7 @@
         }
 
         function restaurarGavetaPadrao() {
-            if(confirm('Deseja restaurar os itens fixos padrão na gaveta deste mês? (Itens que já foram removidos ou jogados nas semanas voltarão a aparecer na gaveta).')) {
+            if(confirm('Deseja restaurar os itens fixos e contas na gaveta deste mês?')) {
                 dadosApp[mesAtual].gaveta = construirGavetaParaMes(mesAtual);
                 salvarTudo();
             }
@@ -637,7 +636,7 @@
 
         function excluirMesAtual() {
             let chaves = Object.keys(dadosApp);
-            if(chaves.length <= 1) return alert('Você não pode excluir o único mês existente. Crie outro mês antes.');
+            if(chaves.length <= 1) return alert('Você não pode excluir o único mês existente.');
             if(confirm(`Tem certeza que deseja excluir o mês "${dadosApp[mesAtual].nomeExibicao}"?`)) {
                 delete dadosApp[mesAtual];
                 mesAtual = Object.keys(dadosApp)[0];
@@ -674,7 +673,7 @@
             salvarTudo();
         }
 
-        function sincronizarFaturasNasSemanas() {
+        function garantirFaturasNasSemanas() {
             const data = dadosApp[mesAtual];
             if (!data) return;
             configCartoes.forEach(cartao => {
@@ -683,9 +682,21 @@
                 let totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
                 let nomeItemCard = `Cartão ${cartao.nome}`;
                 let semIdx = cartao.semanaTeto;
-                data.semanas.forEach(s => { s.itens = s.itens.filter(it => !it.desc.startsWith(nomeItemCard)); });
-                if (data.semanas[semIdx] && totalRealFatura > 0) {
+                
+                let existeFaturaEmAlgumaSemana = false;
+                data.semanas.forEach(s => {
+                    if (s.itens.some(it => it.desc.startsWith(nomeItemCard))) existeFaturaEmAlgumaSemana = true;
+                });
+
+                if (!existeFaturaEmAlgumaSemana && data.semanas[semIdx] && totalRealFatura > 0) {
                     data.semanas[semIdx].itens.push({ desc: `${nomeItemCard} (Fatura)`, valor: totalRealFatura, tipo: 'saida', pago: false });
+                } else if (existeFaturaEmAlgumaSemana && totalRealFatura > 0) {
+                    // Atualiza o valor caso tenha mudado nos gastos avulsos
+                    data.semanas.forEach(s => {
+                        s.itens.forEach(it => {
+                            if (it.desc.startsWith(nomeItemCard)) it.valor = totalRealFatura;
+                        });
+                    });
                 }
             });
         }
@@ -694,7 +705,7 @@
             const data = dadosApp[mesAtual];
             if(!data) return;
             sincronizarMesCompleto(mesAtual);
-            sincronizarFaturasNasSemanas();
+            garantirFaturasNasSemanas();
             document.getElementById('lblMesCartoes').innerText = data.nomeExibicao;
             const grid = document.getElementById('gridCartoesDinamicos');
             grid.innerHTML = '';
@@ -719,8 +730,8 @@
                 let linhasItens = itensFatura.map((item, idx) => `
                     <tr class="hover:bg-slate-50">
                         <td class="p-2 font-medium text-slate-800">${item.desc}</td>
-                        <td class="p-2 text-slate-600">R$ ${item.orcado.toFixed(2).replace('.', ',')}</td>
-                        <td class="p-2 font-semibold text-slate-800">R$ ${item.real.toFixed(2).replace('.', ',')}</td>
+                        <td class="p-2 text-slate-600">R$ ${(item.orcado || 0).toFixed(2).replace('.', ',')}</td>
+                        <td class="p-2 font-semibold text-slate-800">R$ ${(item.real || 0).toFixed(2).replace('.', ',')}</td>
                         <td class="p-2 text-center">
                             <button onclick="abrirModalGastoCartao('${cartao.nome}', ${idx})" class="text-slate-400 hover:text-indigo-600 px-1" title="Editar Gasto"><i class="fa-solid fa-pen text-[10px]"></i></button>
                             <button onclick="excluirGastoCartao('${cartao.nome}', ${idx})" class="text-slate-400 hover:text-rose-600 px-1" title="Excluir Gasto"><i class="fa-solid fa-xmark text-[10px]"></i></button>
@@ -740,7 +751,7 @@
                                 <span class="text-xl font-bold ${corTxt}">R$ ${tetoDisponivel.toFixed(2).replace('.', ',')}</span>
                             </div>
                             <div>
-                                <div class="flex justify-between items-center mb-1"><label class="text-xs font-semibold text-slate-700">Fatura</label><button onclick="abrirModalGastoCartao('${cartao.nome}')" class="text-xs text-indigo-600 font-semibold hover:underline"><i class="fa-solid fa-plus"></i> Adicionar Gasto Avulso</button></div>
+                                <div class="flex justify-between items-center mb-1"><label class="text-xs font-semibold text-slate-700">Fatura & Gastos</label><button onclick="abrirModalGastoCartao('${cartao.nome}')" class="text-xs text-indigo-600 font-semibold hover:underline"><i class="fa-solid fa-plus"></i> Adicionar Gasto Avulso</button></div>
                                 <div class="overflow-x-auto border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
                                     <table class="w-full text-left text-xs"><thead class="bg-slate-100 text-slate-600 uppercase"><tr><th class="p-2">Desc</th><th class="p-2">Orçado</th><th class="p-2">Real</th><th class="p-2 text-center">Ações</th></tr></thead><tbody class="divide-y divide-slate-100">${linhasItens}</tbody></table>
                                 </div>
@@ -765,7 +776,7 @@
                     let itensFatura = mData[`itens${cartao.nome}`] || [];
                     let totalMes = 0;
                     let celdasCat = categorias.map(cat => {
-                        let val = cat === 'PARCELAS' ? itensFatura.filter(i => i.desc.startsWith('[Parcela]')).reduce((a,b)=>a+b.real,0) : (itensFatura.find(i=>i.desc===cat)?.real || 0);
+                        let val = cat === 'PARCELAS' ? itensFatura.filter(i => i.desc.startsWith('[Parcela]')).reduce((a,b)=>a+(b.real||0),0) : (itensFatura.find(i=>i.desc===cat)?.real || 0);
                         totalMes += val;
                         return `<td class="p-2 border text-center">${val > 0 ? 'R$ ' + val.toFixed(2).replace('.', ',') : '-'}</td>`;
                     }).join('');
@@ -788,8 +799,8 @@
                 let item = itens[itemIdx];
                 document.getElementById('tituloModalGastoCartao').innerText = `Editar Gasto (${cartao})`;
                 document.getElementById('gastoDesc').value = item.desc; 
-                document.getElementById('gastoOrcado').value = item.orcado; 
-                document.getElementById('gastoReal').value = item.real;
+                document.getElementById('gastoOrcado').value = item.orcado || 0; 
+                document.getElementById('gastoReal').value = item.real || 0;
             } else {
                 document.getElementById('tituloModalGastoCartao').innerText = `Adicionar Gasto (${cartao})`;
                 document.getElementById('gastoDesc').value = ''; 
@@ -828,7 +839,7 @@
         }
 
         function excluirGastoCartao(cartao, itemIdx) {
-            if(confirm('Tem certeza que deseja excluir este gasto do cartão?')) { 
+            if(confirm('Tem certeza que deseja excluir este gasto?')) { 
                 dadosApp[mesAtual][`itens${cartao}`].splice(itemIdx, 1); 
                 salvarTudo(); 
             }
@@ -1009,7 +1020,7 @@
         }
 
         function excluirParcela(id) {
-            if(confirm('Tem certeza que deseja excluir esta parcela/assinatura? Ela será removida de todos os cartões e meses.')) {
+            if(confirm('Tem certeza que deseja excluir esta parcela/assinatura?')) {
                 parceladosApp = parceladosApp.filter(x => x.id !== id);
                 salvarTudo();
             }
@@ -1085,7 +1096,7 @@
                 <li draggable="true" ondragstart="drag(event, 'gaveta', -1, ${itemIdx})" class="py-2 px-2 bg-white rounded border shadow-sm flex items-center justify-between text-xs gap-2 cursor-grab">
                     <span class="truncate font-medium">${item.desc}</span>
                     <div class="flex items-center gap-1.5 whitespace-nowrap">
-                        <span class="font-semibold ${item.tipo === 'entra' ? 'text-emerald-600' : ''}">${item.tipo === 'entra'?'+':''}R$ ${item.valor.toFixed(2)}</span>
+                        <span class="font-semibold ${item.tipo === 'entra' ? 'text-emerald-600' : ''}">${item.tipo === 'entra'?'+':''}R$ ${(item.valor || 0).toFixed(2)}</span>
                         <button onclick="abrirModalTransacao(-1, ${itemIdx})" class="text-slate-400 hover:text-indigo-600 px-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
                         <button onclick="excluirTransacao(-1, ${itemIdx})" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-[10px]"></i></button>
                     </div>
@@ -1093,12 +1104,15 @@
             `).join('');
 
             let totalEntradas = 0, totalSaidas = 0;
+            let saldoAcumuladoCascata = 0; // Saldo que transborda em cascata para a semana seguinte
             const gridSemanas = document.getElementById('gridSemanas'); gridSemanas.innerHTML = '';
+            
             data.semanas.forEach((sem, semIdx) => {
                 let entraSemana = 0, saidaSemana = 0;
                 let itensHtml = (sem.itens || []).map((item, itemIdx) => {
-                    if(item.tipo === 'entra' || item.tipo === 'resgate') entraSemana += item.valor;
-                    else if(item.tipo === 'saida' || item.tipo === 'aplicacao') saidaSemana += item.valor;
+                    let val = item.valor || 0;
+                    if(item.tipo === 'entra' || item.tipo === 'resgate') entraSemana += val;
+                    else if(item.tipo === 'saida' || item.tipo === 'aplicacao') saidaSemana += val;
                     return `
                         <li draggable="true" ondragstart="drag(event, 'semana', ${semIdx}, ${itemIdx})" class="py-2 px-2 bg-white rounded border shadow-sm flex items-center justify-between text-xs gap-2 cursor-grab">
                             <div class="flex items-center gap-2 overflow-hidden">
@@ -1106,7 +1120,7 @@
                                 <span class="${item.pago ? 'line-through text-slate-400' : ''} truncate font-medium">${item.desc}</span>
                             </div>
                             <div class="flex items-center gap-1.5 whitespace-nowrap">
-                                <span class="font-semibold ${item.tipo === 'entra'||item.tipo==='resgate'?'text-emerald-600':''}">${item.tipo==='entra'||item.tipo==='resgate'?'+':''}R$ ${item.valor.toFixed(2)}</span>
+                                <span class="font-semibold ${item.tipo === 'entra'||item.tipo==='resgate'?'text-emerald-600':''}">${item.tipo==='entra'||item.tipo==='resgate'?'+':''}R$ ${val.toFixed(2)}</span>
                                 <button onclick="abrirModalTransacao(${semIdx}, ${itemIdx})" class="text-slate-400 hover:text-indigo-600 px-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
                                 <button onclick="excluirTransacao(${semIdx}, ${itemIdx})" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-[10px]"></i></button>
                             </div>
@@ -1114,12 +1128,18 @@
                     `;
                 }).join('');
 
-                totalEntradas += entraSemana; totalSaidas += saidaSemana; let sobraSemana = entraSemana - saidaSemana;
+                totalEntradas += entraSemana; 
+                totalSaidas += saidaSemana; 
+                
+                // Saldo da semana atual somado ao saldo acumulado da semana anterior (efeito cascata)
+                let sobraSemana = (entraSemana - saidaSemana) + saldoAcumuladoCascata;
+                saldoAcumuladoCascata = sobraSemana; // O saldo final vira o acumulado para a próxima
+
                 gridSemanas.innerHTML += `
                     <div class="bg-white rounded-xl border shadow-sm overflow-hidden flex flex-col">
                         <div class="bg-slate-100 p-3 border-b flex justify-between items-center">
                             <div><span class="text-[10px] uppercase font-bold text-slate-500">Semana ${semIdx + 1}</span><h4 class="text-xs font-bold">${sem.periodo}</h4></div>
-                            <div class="text-right"><span class="text-[10px] text-slate-400 block">Sobra</span><span class="text-xs font-bold ${sobraSemana>=0?'text-emerald-600':'text-rose-600'}">R$ ${sobraSemana.toFixed(2)}</span></div>
+                            <div class="text-right"><span class="text-[10px] text-slate-400 block">Sobra Acumulada</span><span class="text-xs font-bold ${sobraSemana>=0?'text-emerald-600':'text-rose-600'}">R$ ${sobraSemana.toFixed(2)}</span></div>
                         </div>
                         <div class="p-3 flex-1 flex flex-col justify-between kanban-drop-zone" ondragover="allowDrop(event)" ondragleave="leaveDrop(event)" ondrop="drop(event, ${semIdx})">
                             <ul class="space-y-2 max-h-56 overflow-y-auto pr-1">${itensHtml}</ul>
