@@ -13,6 +13,15 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
         .kanban-drop-zone { min-height: 150px; transition: background-color 0.2s; }
         .kanban-drop-zone.drag-over { background-color: #f1f5f9; border: 2px dashed #6366f1; border-radius: 0.5rem; }
+        @media (max-width: 640px) {
+            main { padding: 0.75rem; }
+            nav .tab-btn { min-width: 118px; flex: 0 0 auto; white-space: nowrap; }
+            #gridCartoesDinamicos { grid-template-columns: minmax(0, 1fr); }
+            #gridCartoesDinamicos > div { min-width: 0; }
+            #modalTabelaPlanilha { align-items: flex-start; }
+            #modalTabelaPlanilha > div { margin-top: 1rem; max-height: calc(100vh - 2rem); padding: 1rem; }
+            .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 h-full flex flex-col">
@@ -50,7 +59,7 @@
 
     <div id="sistemaApp" class="hidden h-full flex flex-col">
         <header class="bg-indigo-900 text-white shadow-md">
-            <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
                 <div>
                     <h1 class="text-xl font-bold flex items-center gap-2">
                         <i class="fa-solid fa-wallet text-indigo-400"></i> Gestor Financeiro Pro
@@ -154,8 +163,8 @@
             <section id="aba-cartoes" class="hidden space-y-6">
                 <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-r-lg flex justify-between items-center flex-wrap gap-3">
                     <div>
-                        <h3 class="font-semibold text-blue-900 text-sm">Fatura Paga em <span id="lblMesCartoes">Mês Atual</span></h3>
-                        <p class="text-xs text-blue-800">A fatura e os tetos exibidos aqui correspondem aos gastos feitos no mês anterior (<span id="lblMesAnteriorNome">mês passado</span>).</p>
+                        <h3 class="font-semibold text-blue-900 text-sm">Cartões de <span id="lblMesCartoes">Mês Atual</span></h3>
+                        <p class="text-xs text-blue-800">Lançamentos realizados no mês atual. O teto disponível é calculado com base nestes gastos.</p>
                     </div>
                     <button onclick="abrirModalTabelaPlanilha()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5">
                         <i class="fa-solid fa-table"></i> Visão Consolidada (Estilo Planilha)
@@ -449,6 +458,17 @@
             return `${ano}-${String(mes).padStart(2, '0')}`;
         }
 
+        function obterProximoMes(mesKey) {
+            if (!mesKey || !mesKey.includes('-')) return mesKey;
+            let [ano, mes] = mesKey.split('-').map(Number);
+            mes += 1;
+            if (mes === 13) {
+                mes = 1;
+                ano += 1;
+            }
+            return `${ano}-${String(mes).padStart(2, '0')}`;
+        }
+
         async function verificarSessao() {
             if(!supabaseClient) return;
             const { data: { session } } = await supabaseClient.auth.getSession();
@@ -631,7 +651,7 @@
                     }
                 });
 
-                // Garante Parcelas Admin associadas ao cartão
+                // Garante Parcelas Admin associadas ao cartão (conforme cadastro)
                 parceladosApp.forEach(p => {
                     let dest = (p.destino || '').toLowerCase().replace('cartão', '').trim();
                     if (dest === nomeCartaoBusca) {
@@ -795,7 +815,7 @@
             
             configCartoes.forEach(cartao => {
                 let chaveItens = `itens${cartao.nome}`;
-                // Puxa os gastos do mês anterior para formar a fatura que vence e é paga neste mês
+                // Puxa os gastos do MÊS ANTERIOR para aparecerem como Fatura no Kanban do MÊS ATUAL
                 let itensFatura = dadosMesAnterior && dadosMesAnterior[chaveItens] ? dadosMesAnterior[chaveItens] : [];
                 let totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
                 let nomeItemCard = `Cartão ${cartao.nome}`;
@@ -821,39 +841,60 @@
         function calcularTetosDinamicos() {
             const data = dadosApp[mesAtual];
             if(!data) return;
+
             sincronizarMesCompleto(mesAtual);
-
-            let mesAnteriorId = obterMesAnterior(mesAtual);
-            let dadosMesAnterior = dadosApp[mesAnteriorId];
-            let nomeMesAntExib = dadosMesAnterior ? dadosMesAnterior.nomeExibicao : "mês anterior";
-            document.getElementById('lblMesAnteriorNome').innerText = nomeMesAntExib;
-
             garantirFaturasNasSemanas();
+
             document.getElementById('lblMesCartoes').innerText = data.nomeExibicao;
 
             const grid = document.getElementById('gridCartoesDinamicos');
             grid.innerHTML = '';
 
+            // Os gastos/compromissos do mês atual formarão a fatura do próximo mês.
+            const proximoMesId = obterProximoMes(mesAtual);
+            const dataProximoMes = dadosApp[proximoMesId];
+
             configCartoes.forEach(cartao => {
-                let saldoSemanaTeto = 0;
-                let semIdx = Math.min(cartao.semanaTeto, data.semanas.length - 1);
-                if(data.semanas[semIdx]) {
-                    (data.semanas[semIdx].itens || []).forEach(it => {
-                        if(it.tipo === 'entra' || it.tipo === 'resgate') saldoSemanaTeto += (it.valor || 0);
-                        else if(it.tipo === 'saida' && !it.desc.startsWith(`Cartão ${cartao.nome}`)) saldoSemanaTeto -= (it.valor || 0);
-                        else if(it.tipo === 'aplicacao') saldoSemanaTeto -= (it.valor || 0);
+                const chaveItens = `itens${cartao.nome}`;
+                const itensMesAtual = data[chaveItens] || [];
+
+                // "Real" representa o valor já comprometido. O orçamento é o valor
+                // inicial desse compromisso e pode ser alterado pela usuária.
+                const totalComprometidoMes = itensMesAtual.reduce(
+                    (acc, i) => acc + (i.real || 0), 0
+                );
+
+                // A semana de pagamento da fatura é no mês seguinte.
+                const semIdx = dataProximoMes
+                    ? Math.min(cartao.semanaTeto, dataProximoMes.semanas.length - 1)
+                    : -1;
+
+                // Capacidade financeira da semana de pagamento, antes da nova fatura.
+                let capacidadeSemana = 0;
+
+                if (dataProximoMes && dataProximoMes.semanas[semIdx]) {
+                    (dataProximoMes.semanas[semIdx].itens || []).forEach(it => {
+                        // A fatura do cartão atual não entra aqui: ela é calculada
+                        // pelos compromissos do mês atual e já está representada em
+                        // totalComprometidoMes.
+                        if (it.desc.startsWith(`Cartão ${cartao.nome}`)) return;
+
+                        if(it.tipo === 'entra' || it.tipo === 'resgate') {
+                            capacidadeSemana += (it.valor || 0);
+                        } else if(it.tipo === 'saida' || it.tipo === 'aplicacao') {
+                            capacidadeSemana -= (it.valor || 0);
+                        }
                     });
                 }
-                
-                let chaveItens = `itens${cartao.nome}`;
-                // Exibe na aba de cartões do mês atual os gastos que foram feitos no mês anterior
-                let itensFatura = dadosMesAnterior && dadosMesAnterior[chaveItens] ? dadosMesAnterior[chaveItens] : [];
-                let totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
-                let tetoDisponivel = saldoSemanaTeto - totalRealFatura;
+
+                // O teto restante é a capacidade da semana de pagamento menos
+                // tudo que já está comprometido no cartão neste mês.
+                const tetoDisponivel = capacidadeSemana - totalComprometidoMes;
+
                 let corBg = cartao.cor === 'rose' ? 'bg-rose-500' : (cartao.cor === 'emerald' ? 'bg-emerald-600' : (cartao.cor === 'amber' ? 'bg-amber-600' : 'bg-indigo-600'));
                 let corTxt = cartao.cor === 'rose' ? 'text-rose-700' : (cartao.cor === 'emerald' ? 'text-emerald-700' : (cartao.cor === 'amber' ? 'text-amber-700' : 'text-indigo-700'));
 
-                let linhasItens = itensFatura.map((item, idx) => `
+                let linhasItens = itensMesAtual.map((item, idx) => `
                     <tr class="hover:bg-slate-50">
                         <td class="p-2 font-medium text-slate-800">${item.desc}</td>
                         <td class="p-2 text-slate-600">R$ ${formatarMoeda(item.orcado)}</td>
@@ -866,20 +907,21 @@
                 `).join('');
 
                 grid.innerHTML += `
-                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                        <div class="${corBg} text-white p-4 flex justify-between items-center">
-                            <div><h3 class="font-bold text-base">${cartao.nome}</h3><p class="text-xs opacity-90">Fatura referente aos gastos de ${nomeMesAntExib}</p></div>
-                            <span class="bg-black/20 text-xs px-2.5 py-1 rounded-full font-medium">Limite R$ ${formatarMoeda(cartao.limite)}</span>
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-w-0">
+                        <div class="${corBg} text-white p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <div class="min-w-0"><h3 class="font-bold text-base truncate">${cartao.nome}</h3><p class="text-xs opacity-90">Gastos em ${data.nomeExibicao} (Fatura vence no próximo mês)</p></div>
+                            <span class="bg-black/20 text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap">Limite R$ ${formatarMoeda(cartao.limite)}</span>
                         </div>
                         <div class="p-4 space-y-4 flex-1">
                             <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
-                                <span class="text-[10px] ${corTxt} font-bold block uppercase">Teto Disponível na Semana ${semIdx + 1}:</span>
+                                <span class="text-[10px] ${corTxt} font-bold block uppercase">Teto Disponível • Semana ${dataProximoMes ? semIdx + 1 : '—'} do próximo mês</span>
                                 <span class="text-xl font-bold ${corTxt}">R$ ${formatarMoeda(tetoDisponivel)}</span>
+                                <span class="text-[10px] text-slate-500 block mt-1">${dataProximoMes ? `Calculado pela semana de pagamento em ${dataProximoMes.nomeExibicao || proximoMesId}` : 'Crie o próximo mês para calcular o teto.'}</span>
                             </div>
                             <div>
-                                <div class="flex justify-between items-center mb-1"><label class="text-xs font-semibold text-slate-700">Lançamentos em ${nomeMesAntExib}</label><button onclick="abrirModalGastoCartao('${cartao.nome}')" class="text-xs text-indigo-600 font-semibold hover:underline"><i class="fa-solid fa-plus"></i> Adicionar Gasto em ${nomeMesAntExib}</button></div>
+                                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mb-1"><label class="text-xs font-semibold text-slate-700">Lançamentos em ${data.nomeExibicao}</label><button onclick="abrirModalGastoCartao('${cartao.nome}')" class="self-start text-xs text-indigo-600 font-semibold hover:underline whitespace-nowrap"><i class="fa-solid fa-plus"></i> Adicionar Gasto</button></div>
                                 <div class="overflow-x-auto border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
-                                    <table class="w-full text-left text-xs"><thead class="bg-slate-100 text-slate-600 uppercase"><tr><th class="p-2">Desc</th><th class="p-2">Orçado</th><th class="p-2">Real</th><th class="p-2 text-center">Ações</th></tr></thead><tbody class="divide-y divide-slate-100">${linhasItens}</tbody></table>
+                                    <table class="w-full min-w-[520px] text-left text-xs"><thead class="bg-slate-100 text-slate-600 uppercase"><tr><th class="p-2">Desc</th><th class="p-2">Orçado</th><th class="p-2">Real</th><th class="p-2 text-center">Ações</th></tr></thead><tbody class="divide-y divide-slate-100">${linhasItens}</tbody></table>
                                 </div>
                             </div>
                         </div>
@@ -887,7 +929,6 @@
                 `;
             });
         }
-
         function abrirModalTabelaPlanilha() {
             const container = document.getElementById('conteudoPlanilhaConsolidada');
             container.innerHTML = '';
@@ -918,26 +959,8 @@
             document.getElementById('cartaoAlvo').value = cartao; 
             document.getElementById('gastoCartaoIdx').value = itemIdx !== null ? itemIdx : '';
             
-            // O usuário está na aba do mês atual (ex: Setembro) e quer lançar os gastos que pertencem ao mês anterior (ex: Agosto)
-            let mesAlvoModal = obterMesAnterior(mesAtual);
-            if(!dadosApp[mesAlvoModal]) {
-                let [ano, mes] = mesAlvoModal.split('-').map(Number);
-                let nomesMeses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-                let nomeEx = `${nomesMeses[mes - 1]} ${ano}`;
-                dadosApp[mesAlvoModal] = {
-                    nomeExibicao: nomeEx,
-                    tituloAlerta: `${nomeEx}: Planejamento`,
-                    textoAlerta: "Organize seus gastos.",
-                    gaveta: [],
-                    semanas: [
-                        { periodo: "01 a 07", nome: "1ª Semana", itens: [] },
-                        { periodo: "08 a 15", nome: "2ª Semana", itens: [] },
-                        { periodo: "16 a 22", nome: "3ª Semana", itens: [] },
-                        { periodo: "23 a 30", nome: "4ª Semana", itens: [] }
-                    ]
-                };
-            }
-
+            // Agora os gastos adicionados pertencem exatamente ao mês que está sendo visualizado na tela
+            let mesAlvoModal = mesAtual;
             let chaveItens = `itens${cartao}`;
             if(!dadosApp[mesAlvoModal][chaveItens]) dadosApp[mesAlvoModal][chaveItens] = [];
             let itens = dadosApp[mesAlvoModal][chaveItens];
@@ -945,12 +968,12 @@
             
             if(itemIdx !== null && itens[itemIdx]) {
                 let item = itens[itemIdx];
-                document.getElementById('tituloModalGastoCartao').innerText = `Editar Gasto (${cartao} - Ref: ${nomeMesAlvoExib})`;
+                document.getElementById('tituloModalGastoCartao').innerText = `Editar Gasto (${cartao} - ${nomeMesAlvoExib})`;
                 document.getElementById('gastoDesc').value = item.desc; 
                 document.getElementById('gastoOrcado').value = formatarMoeda(item.orcado || 0); 
                 document.getElementById('gastoReal').value = formatarMoeda(item.real || 0);
             } else {
-                document.getElementById('tituloModalGastoCartao').innerText = `Adicionar Gasto (${cartao} - Ref: ${nomeMesAlvoExib})`;
+                document.getElementById('tituloModalGastoCartao').innerText = `Adicionar Gasto (${cartao} - ${nomeMesAlvoExib})`;
                 document.getElementById('gastoDesc').value = ''; 
                 document.getElementById('gastoOrcado').value = ''; 
                 document.getElementById('gastoReal').value = '';
@@ -968,7 +991,7 @@
             const real = parseMoeda(document.getElementById('gastoReal').value);
             if(!desc) return alert('Informe a descrição do gasto.');
             
-            let mesAlvoModal = obterMesAnterior(mesAtual);
+            let mesAlvoModal = mesAtual;
             let chaveItens = `itens${cartao}`;
             if(!dadosApp[mesAlvoModal][chaveItens]) dadosApp[mesAlvoModal][chaveItens] = [];
             let itens = dadosApp[mesAlvoModal][chaveItens];
@@ -989,8 +1012,7 @@
 
         function excluirGastoCartao(cartao, itemIdx) {
             if(confirm('Tem certeza que deseja excluir este gasto?')) { 
-                let mesAlvoModal = obterMesAnterior(mesAtual);
-                dadosApp[mesAlvoModal][`itens${cartao}`].splice(itemIdx, 1); 
+                dadosApp[mesAtual][`itens${cartao}`].splice(itemIdx, 1); 
                 salvarTudo(); 
             }
         }
