@@ -857,71 +857,76 @@
             return itens.reduce((acc, i) => acc + (i.real || 0), 0);
         }
 
-        function registrarPagamentoFatura(cartaoNome, mesFaturaId) {
-            const mesPagamento = mesAtual;
-            const chave = `pagamentos${cartaoNome}`;
-            if (!dadosApp[mesPagamento]) return;
+        function abrirModalPagamentoFatura(cartaoNome, mesFaturaId) {
+            const fatura = calcularFaturaMes(mesFaturaId, {nome: cartaoNome});
+            if (fatura <= 0) return alert('Não há valor de fatura para registrar.');
 
-            if (!dadosApp[mesPagamento][chave]) dadosApp[mesPagamento][chave] = [];
+            const pago = obterTotalPagoFatura(mesFaturaId, cartaoNome);
+            const restante = Math.max(0, fatura - pago);
 
-            const valorAtual = calcularFaturaMes(mesFaturaId, {nome: cartaoNome});
-            if (valorAtual <= 0) return alert('Não há valor de fatura para registrar.');
+            document.getElementById('pagamentoCartaoNome').value = cartaoNome;
+            document.getElementById('pagamentoFaturaMes').value = mesFaturaId;
+            document.getElementById('pagamentoValor').value = formatarMoeda(restante);
+            document.getElementById('pagamentoData').value = '';
 
-            const valorStr = prompt(
-                `Valor pago da fatura ${cartaoNome}:`,
-                formatarMoeda(valorAtual)
-            );
-            if (valorStr === null) return;
+            const resumo = document.getElementById('pagamentoResumo');
+            if (resumo) {
+                resumo.innerHTML = `
+                    <div class="font-semibold text-slate-800">Fatura ${cartaoNome}</div>
+                    <div class="grid grid-cols-3 gap-2 mt-2 text-center">
+                        <div><div class="text-[10px] text-slate-500 uppercase">Fatura</div><div class="font-bold">R$ ${formatarMoeda(fatura)}</div></div>
+                        <div><div class="text-[10px] text-slate-500 uppercase">Já pago</div><div class="font-bold text-emerald-600">R$ ${formatarMoeda(pago)}</div></div>
+                        <div><div class="text-[10px] text-slate-500 uppercase">Restante</div><div class="font-bold text-rose-600">R$ ${formatarMoeda(restante)}</div></div>
+                    </div>`;
+            }
+
+            document.getElementById('modalPagamentoFatura').classList.remove('hidden');
+        }
+
+        function fecharModalPagamentoFatura() {
+            document.getElementById('modalPagamentoFatura').classList.add('hidden');
+        }
+
+        function confirmarPagamentoFatura() {
+            const cartaoNome = document.getElementById('pagamentoCartaoNome').value;
+            const mesFaturaId = document.getElementById('pagamentoFaturaMes').value;
+            const valorStr = document.getElementById('pagamentoValor').value;
+            const dataStr = document.getElementById('pagamentoData').value.trim();
 
             const valor = parseMoeda(valorStr);
-            if (!valor || valor <= 0) {
-                return alert('Informe um valor válido.');
+            const fatura = calcularFaturaMes(mesFaturaId, {nome: cartaoNome});
+            const pago = obterTotalPagoFatura(mesFaturaId, cartaoNome);
+            const restante = Math.max(0, fatura - pago);
+
+            if (!valor || valor <= 0) return alert('Informe um valor válido.');
+            if (valor > restante + 0.01) return alert(`O pagamento não pode ser maior que o restante da fatura: R$ ${formatarMoeda(restante)}.`);
+
+            let dataISO = '';
+            if (dataStr) {
+                const match = dataStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                if (!match) return alert('Use o formato DD/MM/AAAA.');
+                const dia = Number(match[1]), mes = Number(match[2]), ano = Number(match[3]);
+                const d = new Date(ano, mes - 1, dia);
+                if (d.getFullYear() !== ano || d.getMonth() !== mes - 1 || d.getDate() !== dia) {
+                    return alert('Informe uma data válida no formato DD/MM/AAAA.');
+                }
+                dataISO = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
             }
 
-            // A interface usa DD/MM/AAAA. Internamente mantemos AAAA-MM-DD
-            // para facilitar ordenação e compatibilidade com os dados existentes.
-            const partesMesAtual = mesAtual.split('-').map(Number);
-            const hoje = new Date();
-            const diaPadrao = hoje.getFullYear() === partesMesAtual[0] && hoje.getMonth() + 1 === partesMesAtual[1]
-                ? hoje.getDate()
-                : 1;
-            const dataPadrao = `${String(diaPadrao).padStart(2, '0')}/${String(partesMesAtual[1]).padStart(2, '0')}/${partesMesAtual[0]}`;
+            const chave = `pagamentos${cartaoNome}`;
+            if (!dadosApp[mesFaturaId]) dadosApp[mesFaturaId] = dadosApp[mesAtual] || {};
+            if (!dadosApp[mesFaturaId][chave]) dadosApp[mesFaturaId][chave] = [];
 
-            const dataStr = prompt(
-                'Data do pagamento (DD/MM/AAAA):',
-                dataPadrao
-            );
-            if (dataStr === null) return;
-
-            const match = dataStr.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-            if (!match) {
-                return alert('Use o formato DD/MM/AAAA.');
-            }
-
-            const dia = Number(match[1]);
-            const mes = Number(match[2]);
-            const ano = Number(match[3]);
-            const dataObj = new Date(ano, mes - 1, dia);
-
-            if (
-                dataObj.getFullYear() !== ano ||
-                dataObj.getMonth() !== mes - 1 ||
-                dataObj.getDate() !== dia
-            ) {
-                return alert('Informe uma data válida no formato DD/MM/AAAA.');
-            }
-
-            const dataISO = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-
-            dadosApp[mesPagamento][chave].push({
-                id: Date.now(),
+            dadosApp[mesFaturaId][chave].push({
+                id: Date.now() + Math.random(),
                 faturaMes: mesFaturaId,
                 valor,
                 data: dataISO,
-                dataExibicao: dataStr.trim(),
+                dataExibicao: dataStr,
                 pagoAntecipado: true
             });
 
+            fecharModalPagamentoFatura();
             salvarTudo();
         }
 
@@ -1153,10 +1158,11 @@
                                     <span><strong class="text-slate-700">Total da fatura:</strong> R$ ${formatarMoeda(faturaPrevista)}</span>
                                     <span><strong class="text-slate-700">Realizado:</strong> R$ ${formatarMoeda(totalRealizado)}</span>
                                     <span><strong class="text-slate-700">Pago:</strong> R$ ${formatarMoeda(obterTotalPagoFatura(mesAtual, cartao.nome))}</span>
+                                    <span><strong class="text-slate-700">Restante:</strong> R$ ${formatarMoeda(Math.max(0, faturaPrevista - obterTotalPagoFatura(mesAtual, cartao.nome)))}</span>
                                 </div>
-                                <button onclick="registrarPagamentoFatura('${cartao.nome}', '${mesAtual}')"
+                                <button onclick="abrirModalPagamentoFatura('${cartao.nome}', '${mesAtual}')"
                                     class="mb-3 w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-semibold">
-                                    <i class="fa-solid fa-money-bill-wave"></i> Registrar pagamento desta fatura
+                                    <i class="fa-solid fa-money-bill-wave"></i> ${obterTotalPagoFatura(mesAtual, cartao.nome) >= faturaPrevista && faturaPrevista > 0 ? 'Registrar novo pagamento' : 'Registrar pagamento'}
                                 </button>
                                 <div class="overflow-x-auto border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
                                     <table class="w-full min-w-[520px] text-left text-xs"><thead class="bg-slate-100 text-slate-600 uppercase"><tr><th class="p-2">Desc</th><th class="p-2">Orçado</th><th class="p-2">Real</th><th class="p-2 text-center">Ações</th></tr></thead><tbody class="divide-y divide-slate-100">${linhasItens}</tbody></table>
@@ -1612,5 +1618,34 @@
             document.getElementById('resumoSobra').innerText = `R$ ${formatarMoeda(totalEntradas - totalSaidas)}`;
         }
     </script>
+
+    <!-- Modal de pagamento de fatura -->
+    <div id="modalPagamentoFatura" class="hidden fixed inset-0 z-[80] bg-black/50 p-4 flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-5">
+            <div class="flex items-center justify-between gap-3 mb-4">
+                <h3 class="font-bold text-lg text-slate-800">Registrar pagamento da fatura</h3>
+                <button onclick="fecharModalPagamentoFatura()" class="text-slate-400 hover:text-slate-700 text-xl">&times;</button>
+            </div>
+            <div id="pagamentoResumo" class="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4 text-sm"></div>
+            <input type="hidden" id="pagamentoCartaoNome">
+            <input type="hidden" id="pagamentoFaturaMes">
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs font-semibold text-slate-600 block mb-1">Valor deste pagamento</label>
+                    <input id="pagamentoValor" type="text" inputmode="decimal" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm" placeholder="R$ 0,00">
+                    <p class="text-[10px] text-slate-500 mt-1">Você pode registrar vários pagamentos para a mesma fatura.</p>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-slate-600 block mb-1">Data do pagamento (DD/MM/AAAA)</label>
+                    <input id="pagamentoData" type="text" inputmode="numeric" maxlength="10" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm" placeholder="DD/MM/AAAA">
+                    <p class="text-[10px] text-slate-500 mt-1">Deixe em branco se quiser definir a semana diretamente no Kanban.</p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-5">
+                <button onclick="fecharModalPagamentoFatura()" class="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-700">Cancelar</button>
+                <button onclick="confirmarPagamentoFatura()" class="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white">Registrar pagamento</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
