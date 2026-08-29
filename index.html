@@ -127,7 +127,7 @@
                         <i class="fa-solid fa-rotate-right"></i> Sincronizar Gaveta com Parcelas
                     </button>
                     <button onclick="abrirModalSemanaExtra()" class="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition-colors">
-                        <i class="fa-solid fa-calendar-plus"></i> + Adicionar Semana Extra
+                        <i class="fa-solid fa-calendar-plus"></i> + Adicionar Semana
                     </button>
                 </div>
 
@@ -250,6 +250,22 @@
         </div>
     </div>
 
+    <div id="modalEditarSemana" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 class="font-bold text-slate-800 text-lg">Editar Período da Semana</h3>
+            <input type="hidden" id="editSemanaIdx">
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Nome / Rótulo (Ex: 1ª Semana)</label><input type="text" id="inputSemanaNome" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Período (Ex: 01 a 10)</label><input type="text" id="inputSemanaPeriodo" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+            <div class="flex justify-between items-center pt-2">
+                <button onclick="excluirSemanaAtual()" class="px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 rounded-lg font-semibold"><i class="fa-solid fa-trash"></i> Excluir Semana</button>
+                <div class="flex gap-2">
+                    <button onclick="fecharModalEditarSemana()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button>
+                    <button onclick="salvarEditarSemana()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="modalTabelaPlanilha" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
         <div class="bg-white rounded-xl max-w-5xl w-full p-6 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-3">
@@ -265,7 +281,7 @@
             <h3 class="font-bold text-slate-800 text-lg" id="tituloModalTransacao">Adicionar Conta / Transação</h3>
             <input type="hidden" id="transacaoSemanaIdx"><input type="hidden" id="transacaoItemIdx">
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Nome / Descrição</label><input type="text" id="transacaoDesc" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none"></div>
-            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Valor (R$)</label><input type="number" step="0.01" id="transacaoValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none" placeholder="0,00"></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Valor (R$)</label><input type="text" id="transacaoValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none" placeholder="0,00" oninput="mascaraMoeda(this)"></div>
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Tipo</label>
                 <select id="transacaoTipo" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none" onchange="verificarTipoTransacao(this.value)">
                     <option value="saida">Saída / Conta</option><option value="entra">Entrada</option><option value="aplicacao">Aplicação (Reserva+)</option><option value="resgate">Resgate (Reserva-)</option>
@@ -274,7 +290,7 @@
             <div id="containerEscolhaReserva" class="hidden"><label class="text-xs font-semibold text-slate-600 block mb-1">Quadro de Reserva</label><select id="transacaoQuadroReserva" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></select></div>
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Destino Inicial</label>
                 <select id="transacaoSemanaDestino" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
-                    <option value="-1">Gaveta de Fixos</option><option value="0">1ª Semana</option><option value="1">2ª Semana</option><option value="2">3ª Semana</option><option value="3">4ª Semana</option>
+                    <option value="-1">Gaveta de Fixos</option>
                 </select>
             </div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalTransacao()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarTransacao()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
@@ -287,8 +303,8 @@
             <input type="hidden" id="cartaoAlvo"><input type="hidden" id="gastoCartaoIdx">
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Descrição</label><input type="text" id="gastoDesc" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
             <div class="grid grid-cols-2 gap-2">
-                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Orçado</label><input type="number" step="0.01" id="gastoOrcado" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
-                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Real</label><input type="number" step="0.01" id="gastoReal" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Orçado</label><input type="text" id="gastoOrcado" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="0,00" oninput="mascaraMoeda(this)"></div>
+                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Real</label><input type="text" id="gastoReal" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="0,00" oninput="mascaraMoeda(this)"></div>
             </div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalGastoCartao()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarGastoCartao()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
         </div>
@@ -305,8 +321,9 @@
 
     <div id="modalSemanaExtra" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
-            <h3 class="font-bold text-slate-800 text-lg">Semana Extra</h3>
-            <input type="text" id="inputPeriodoExtra" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="23 a 31">
+            <h3 class="font-bold text-slate-800 text-lg">Adicionar Nova Semana</h3>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Nome / Rótulo (Ex: 5ª Semana)</label><input type="text" id="inputNomeExtra" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="5ª Semana"></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Período (Ex: 23 a 31)</label><input type="text" id="inputPeriodoExtra" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="23 a 31"></div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalSemanaExtra()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="confirmarSemanaExtra()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Adicionar</button></div>
         </div>
     </div>
@@ -316,7 +333,7 @@
             <h3 class="font-bold text-slate-800 text-lg" id="tituloModalParcelado">Nova Parcela / Assinatura</h3>
             <input type="hidden" id="parcIdEdicao">
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Descrição</label><input type="text" id="parcDesc" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Ex: Netflix, Academia, Compra..."></div>
-            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Valor (R$)</label><input type="number" step="0.01" id="parcValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="0.00"></div>
+            <div><label class="text-xs font-semibold text-slate-600 block mb-1">Valor (R$)</label><input type="text" id="parcValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="0,00" oninput="mascaraMoeda(this)"></div>
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Destino</label><select id="parcDestino" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></select></div>
             <div class="grid grid-cols-2 gap-2">
                 <div><label class="text-xs font-semibold text-slate-600 block mb-1">Início (Opcional)</label><input type="month" id="parcInicio" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
@@ -330,8 +347,8 @@
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 class="font-bold text-slate-800 text-lg">Novo Quadro de Reserva</h3>
             <input type="text" id="novoQuadroNome" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Nome">
-            <input type="number" step="0.01" id="novoQuadroMeta" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Meta">
-            <input type="number" step="0.01" id="novoQuadroSaldo" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" value="0.00">
+            <input type="text" id="novoQuadroMeta" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Meta" oninput="mascaraMoeda(this)">
+            <input type="text" id="novoQuadroSaldo" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" value="0,00" oninput="mascaraMoeda(this)">
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalNovoQuadroReserva()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarNovoQuadroReserva()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Criar</button></div>
         </div>
     </div>
@@ -340,7 +357,7 @@
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 class="font-bold text-slate-800 text-lg" id="tituloModalQuadroReserva">Movimentar Reserva</h3>
             <input type="hidden" id="idQuadroAlvo"><input type="hidden" id="tipoMovQuadro">
-            <input type="number" step="0.01" id="valorMovQuadro" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
+            <input type="text" id="valorMovQuadro" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="0,00" oninput="mascaraMoeda(this)">
             <input type="text" id="descMovQuadro" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Motivo">
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalMovQuadroReserva()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="confirmarMovQuadroReserva()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Confirmar</button></div>
         </div>
@@ -351,7 +368,7 @@
             <h3 class="font-bold text-slate-800 text-lg">Configurar Fixo</h3>
             <input type="hidden" id="adminItemIdx">
             <input type="text" id="adminItemDesc" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Descrição">
-            <input type="number" step="0.01" id="adminItemValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
+            <input type="text" id="adminItemValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="0,00" oninput="mascaraMoeda(this)">
             <select id="adminItemTipo" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="saida">Saída</option><option value="entra">Entrada</option></select>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalAdminItem()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarAdminItem()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
         </div>
@@ -362,7 +379,7 @@
             <h3 class="font-bold text-slate-800 text-lg">Orçamento Categoria</h3>
             <input type="hidden" id="adminOrcIdx">
             <input type="text" id="adminOrcDesc" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Categoria">
-            <input type="number" step="0.01" id="adminOrcValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Valor">
+            <input type="text" id="adminOrcValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="0,00" oninput="mascaraMoeda(this)">
             <select id="adminOrcCartao" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></select>
             <div class="grid grid-cols-2 gap-2"><input type="month" id="adminOrcInicio" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><input type="month" id="adminOrcFim" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalAdminOrcamento()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarAdminOrcamento()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
@@ -374,7 +391,7 @@
             <h3 class="font-bold text-slate-800 text-lg">Configurar Cartão</h3>
             <input type="hidden" id="adminCartaoIdx">
             <input type="text" id="adminCartaoNome" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Nome">
-            <input type="number" step="0.01" id="adminCartaoLimite" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Limite">
+            <input type="text" id="adminCartaoLimite" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="0,00" oninput="mascaraMoeda(this)">
             <select id="adminCartaoSemanaTeto" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="0">Semana 1</option><option value="1">Semana 2</option><option value="2">Semana 3</option><option value="3">Semana 4</option></select>
             <select id="adminCartaoCor" class="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="rose">Rosa</option><option value="indigo">Azul</option><option value="emerald">Verde</option><option value="amber">Laranja</option></select>
             <div class="flex justify-end gap-2 pt-2"><button onclick="fecharModalAdminCartao()" class="px-4 py-2 text-sm text-slate-600">Cancelar</button><button onclick="salvarAdminCartao()" class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg">Salvar</button></div>
@@ -400,6 +417,26 @@
         let quadrosReservasApp = [];
         let dadosApp = {};
         let mesAtual = '';
+
+        function mascaraMoeda(input) {
+            let valor = input.value.replace(/\D/g, '');
+            if (!valor) { input.value = ''; return; }
+            valor = (parseInt(valor, 10) / 100).toFixed(2) + '';
+            valor = valor.replace('.', ',');
+            valor = valor.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            input.value = valor;
+        }
+
+        function parseMoeda(valorStr) {
+            if (!valorStr) return 0;
+            if (typeof valorStr === 'number') return valorStr;
+            let limpo = valorStr.replace(/\./g, '').replace(',', '.');
+            return parseFloat(limpo) || 0;
+        }
+
+        function formatarMoeda(num) {
+            return (num || 0).toFixed(2).replace('.', ',');
+        }
 
         async function verificarSessao() {
             if(!supabaseClient) return;
@@ -530,7 +567,16 @@
         function sincronizarMesCompleto(mesId) {
             if (!dadosApp[mesId]) return;
             
-            // Sincronização da Gaveta
+            // Assegura que o mês tem o array de semanas inicializado
+            if (!dadosApp[mesId].semanas || dadosApp[mesId].semanas.length === 0) {
+                dadosApp[mesId].semanas = [
+                    { periodo: "01 a 07", nome: "1ª Semana", itens: [] },
+                    { periodo: "08 a 15", nome: "2ª Semana", itens: [] },
+                    { periodo: "16 a 22", nome: "3ª Semana", itens: [] },
+                    { periodo: "23 a 30", nome: "4ª Semana", itens: [] }
+                ];
+            }
+
             let gavetaAtual = JSON.parse(JSON.stringify(configFixosPadrao));
             parceladosApp.forEach(p => {
                 let dest = (p.destino || '').toLowerCase();
@@ -556,25 +602,21 @@
                 });
             }
 
-            // Sincronização inteligente dos Cartões (Preservando Gastos Avulsos Manuais)
             configCartoes.forEach(cartao => {
                 let chaveItens = `itens${cartao.nome}`;
                 let itensExistentes = dadosApp[mesId][chaveItens] || [];
                 let itensValidos = [];
                 let nomeCartaoBusca = cartao.nome.toLowerCase().replace('cartão', '').trim();
 
-                // 1. Mantém os gastos avulsos adicionados manualmente pelo usuário (que não estão no admin)
                 itensExistentes.forEach(itemAntigo => {
                     let isOrcamentoAdmin = configOrcamentos.some(o => (o.cartao || '').toLowerCase().replace('cartão','').trim() === nomeCartaoBusca && o.desc === itemAntigo.desc);
                     let isParcelaAdmin = parceladosApp.some(p => (p.destino || '').toLowerCase().replace('cartão','').trim() === nomeCartaoBusca && `[Parcela] ${p.desc}` === itemAntigo.desc);
                     
                     if (!isOrcamentoAdmin && !isParcelaAdmin) {
-                        // É um gasto avulso manual! Mantém intacto
                         itensValidos.push(itemAntigo);
                     }
                 });
 
-                // 2. Adiciona/Atualiza os orçamentos oficiais do admin
                 configOrcamentos.forEach(o => {
                     let cartaoOrc = (o.cartao || '').toLowerCase().replace('cartão', '').trim();
                     if (cartaoOrc === nomeCartaoBusca) {
@@ -586,7 +628,6 @@
                     }
                 });
 
-                // 3. Adiciona/Atualiza as parcelas do cartão
                 parceladosApp.forEach(p => {
                     let dest = (p.destino || '').toLowerCase().replace('cartão', '').trim();
                     if (dest === nomeCartaoBusca) {
@@ -661,6 +702,49 @@
             salvarTudo();
         }
 
+        function abrirModalEditarSemana(semIdx) {
+            let sem = dadosApp[mesAtual].semanas[semIdx];
+            if(!sem) return;
+            document.getElementById('editSemanaIdx').value = semIdx;
+            document.getElementById('inputSemanaNome').value = sem.nome || `Semana ${semIdx + 1}`;
+            document.getElementById('inputSemanaPeriodo').value = sem.periodo || '';
+            document.getElementById('modalEditarSemana').classList.remove('hidden');
+            document.getElementById('modalEditarSemana').classList.add('flex');
+        }
+        function fecharModalEditarSemana() {
+            document.getElementById('modalEditarSemana').classList.remove('flex');
+            document.getElementById('modalEditarSemana').classList.add('hidden');
+        }
+        function salvarEditarSemana() {
+            let idx = parseInt(document.getElementById('editSemanaIdx').value);
+            let nome = document.getElementById('inputSemanaNome').value.trim();
+            let periodo = document.getElementById('inputSemanaPeriodo').value.trim();
+            if(!periodo) return alert('Informe o período da semana.');
+            if(dadosApp[mesAtual].semanas[idx]) {
+                dadosApp[mesAtual].semanas[idx].nome = nome || `Semana ${idx + 1}`;
+                dadosApp[mesAtual].semanas[idx].periodo = periodo;
+            }
+            fecharModalEditarSemana();
+            salvarTudo();
+        }
+        function excluirSemanaAtual() {
+            let idx = parseInt(document.getElementById('editSemanaIdx').value);
+            let semanas = dadosApp[mesAtual].semanas;
+            if(semanas.length <= 1) return alert('O mês precisa ter ao menos uma semana.');
+            
+            let semAlvo = semanas[idx];
+            if(semAlvo.itens && semAlvo.itens.length > 0) {
+                if(!confirm('Esta semana possui itens cadastrados. Ao excluí-la, os itens serão movidos para a Gaveta de Fixos. Deseja continuar?')) return;
+                semAlvo.itens.forEach(it => dadosApp[mesAtual].gaveta.push(it));
+            } else {
+                if(!confirm('Tem certeza que deseja excluir esta semana?')) return;
+            }
+
+            semanas.splice(idx, 1);
+            fecharModalEditarSemana();
+            salvarTudo();
+        }
+
         function excluirMesAtual() {
             let chaves = Object.keys(dadosApp);
             if(chaves.length <= 1) return alert('Você não pode excluir o único mês existente.');
@@ -708,7 +792,7 @@
                 let itensFatura = data[chaveItens] || [];
                 let totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
                 let nomeItemCard = `Cartão ${cartao.nome}`;
-                let semIdx = cartao.semanaTeto;
+                let semIdx = Math.min(cartao.semanaTeto, data.semanas.length - 1);
                 
                 let existeFaturaEmAlgumaSemana = false;
                 data.semanas.forEach(s => {
@@ -738,7 +822,7 @@
 
             configCartoes.forEach(cartao => {
                 let saldoSemanaTeto = 0;
-                let semIdx = cartao.semanaTeto;
+                let semIdx = Math.min(cartao.semanaTeto, data.semanas.length - 1);
                 if(data.semanas[semIdx]) {
                     (data.semanas[semIdx].itens || []).forEach(it => {
                         if(it.tipo === 'entra' || it.tipo === 'resgate') saldoSemanaTeto += (it.valor || 0);
@@ -756,8 +840,8 @@
                 let linhasItens = itensFatura.map((item, idx) => `
                     <tr class="hover:bg-slate-50">
                         <td class="p-2 font-medium text-slate-800">${item.desc}</td>
-                        <td class="p-2 text-slate-600">R$ ${(item.orcado || 0).toFixed(2).replace('.', ',')}</td>
-                        <td class="p-2 font-semibold text-slate-800">R$ ${(item.real || 0).toFixed(2).replace('.', ',')}</td>
+                        <td class="p-2 text-slate-600">R$ ${formatarMoeda(item.orcado)}</td>
+                        <td class="p-2 font-semibold text-slate-800">R$ ${formatarMoeda(item.real)}</td>
                         <td class="p-2 text-center">
                             <button onclick="abrirModalGastoCartao('${cartao.nome}', ${idx})" class="text-slate-400 hover:text-indigo-600 px-1" title="Editar Gasto"><i class="fa-solid fa-pen text-[10px]"></i></button>
                             <button onclick="excluirGastoCartao('${cartao.nome}', ${idx})" class="text-slate-400 hover:text-rose-600 px-1" title="Excluir Gasto"><i class="fa-solid fa-xmark text-[10px]"></i></button>
@@ -768,13 +852,13 @@
                 grid.innerHTML += `
                     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                         <div class="${corBg} text-white p-4 flex justify-between items-center">
-                            <div><h3 class="font-bold text-base">${cartao.nome}</h3><p class="text-xs opacity-90">Teto Semana ${semIdx + 1} • Fatura: R$ ${totalRealFatura.toFixed(2).replace('.', ',')}</p></div>
-                            <span class="bg-black/20 text-xs px-2.5 py-1 rounded-full font-medium">Limite R$ ${cartao.limite.toFixed(2).replace('.', ',')}</span>
+                            <div><h3 class="font-bold text-base">${cartao.nome}</h3><p class="text-xs opacity-90">Teto Semana ${semIdx + 1} • Fatura: R$ ${formatarMoeda(totalRealFatura)}</p></div>
+                            <span class="bg-black/20 text-xs px-2.5 py-1 rounded-full font-medium">Limite R$ ${formatarMoeda(cartao.limite)}</span>
                         </div>
                         <div class="p-4 space-y-4 flex-1">
                             <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
                                 <span class="text-[10px] ${corTxt} font-bold block uppercase">Teto Disponível:</span>
-                                <span class="text-xl font-bold ${corTxt}">R$ ${tetoDisponivel.toFixed(2).replace('.', ',')}</span>
+                                <span class="text-xl font-bold ${corTxt}">R$ ${formatarMoeda(tetoDisponivel)}</span>
                             </div>
                             <div>
                                 <div class="flex justify-between items-center mb-1"><label class="text-xs font-semibold text-slate-700">Fatura & Gastos</label><button onclick="abrirModalGastoCartao('${cartao.nome}')" class="text-xs text-indigo-600 font-semibold hover:underline"><i class="fa-solid fa-plus"></i> Adicionar Gasto Avulso</button></div>
@@ -804,9 +888,9 @@
                     let celdasCat = categorias.map(cat => {
                         let val = cat === 'PARCELAS' ? itensFatura.filter(i => i.desc.startsWith('[Parcela]')).reduce((a,b)=>a+(b.real||0),0) : (itensFatura.find(i=>i.desc===cat)?.real || 0);
                         totalMes += val;
-                        return `<td class="p-2 border text-center">${val > 0 ? 'R$ ' + val.toFixed(2).replace('.', ',') : '-'}</td>`;
+                        return `<td class="p-2 border text-center">${val > 0 ? 'R$ ' + formatarMoeda(val) : '-'}</td>`;
                     }).join('');
-                    linhasMeses += `<tr><td class="p-2 border font-bold bg-slate-50">${(mData.nomeExibicao||mKey).substring(0,3).toUpperCase()}</td>${celdasCat}<td class="p-2 border text-center font-bold text-indigo-700 bg-slate-50">R$ ${totalMes.toFixed(2).replace('.', ',')}</td></tr>`;
+                    linhasMeses += `<tr><td class="p-2 border font-bold bg-slate-50">${(mData.nomeExibicao||mKey).substring(0,3).toUpperCase()}</td>${celdasCat}<td class="p-2 border text-center font-bold text-indigo-700 bg-slate-50">R$ ${formatarMoeda(totalMes)}</td></tr>`;
                 }
                 container.innerHTML += `<div><h4 class="font-bold text-sm mb-2 uppercase">${cartao.nome}</h4><div class="overflow-x-auto"><table class="w-full text-left text-xs border rounded-lg"><thead class="bg-indigo-600 text-white"><tr><th class="p-2 border">Mês</th>${cabecalhoCols}<th class="p-2 border text-center">TOTAL</th></tr></thead><tbody class="divide-y">${linhasMeses}</tbody></table></div></div>`;
             });
@@ -825,8 +909,8 @@
                 let item = itens[itemIdx];
                 document.getElementById('tituloModalGastoCartao').innerText = `Editar Gasto (${cartao})`;
                 document.getElementById('gastoDesc').value = item.desc; 
-                document.getElementById('gastoOrcado').value = item.orcado || 0; 
-                document.getElementById('gastoReal').value = item.real || 0;
+                document.getElementById('gastoOrcado').value = formatarMoeda(item.orcado || 0); 
+                document.getElementById('gastoReal').value = formatarMoeda(item.real || 0);
             } else {
                 document.getElementById('tituloModalGastoCartao').innerText = `Adicionar Gasto (${cartao})`;
                 document.getElementById('gastoDesc').value = ''; 
@@ -842,8 +926,8 @@
             const cartao = document.getElementById('cartaoAlvo').value;
             const itemIdxStr = document.getElementById('gastoCartaoIdx').value;
             const desc = document.getElementById('gastoDesc').value;
-            const orcado = parseFloat(document.getElementById('gastoOrcado').value) || 0;
-            const real = parseFloat(document.getElementById('gastoReal').value) || 0;
+            const orcado = parseMoeda(document.getElementById('gastoOrcado').value);
+            const real = parseMoeda(document.getElementById('gastoReal').value);
             if(!desc) return alert('Informe a descrição do gasto.');
             
             let chaveItens = `itens${cartao}`;
@@ -876,7 +960,7 @@
             const selectReserva = document.getElementById('transacaoQuadroReserva');
             if (tipo === 'aplicacao' || tipo === 'resgate') {
                 containerReserva.classList.remove('hidden');
-                selectReserva.innerHTML = quadrosReservasApp.map(q => `<option value="${q.id}">${q.nome} (Saldo: R$ ${q.saldo.toFixed(2)})</option>`).join('');
+                selectReserva.innerHTML = quadrosReservasApp.map(q => `<option value="${q.id}">${q.nome} (Saldo: R$ ${formatarMoeda(q.saldo)})</option>`).join('');
             } else { containerReserva.classList.add('hidden'); }
         }
 
@@ -884,13 +968,13 @@
             document.getElementById('transacaoSemanaIdx').value = origemIdx; document.getElementById('transacaoItemIdx').value = itemIndex !== null ? itemIndex : '';
             let selectDest = document.getElementById('transacaoSemanaDestino');
             selectDest.innerHTML = '<option value="-1">Gaveta de Fixos</option>';
-            dadosApp[mesAtual].semanas.forEach((s, idx) => { selectDest.innerHTML += `<option value="${idx}">Semana ${idx + 1} (${s.periodo})</option>`; });
+            dadosApp[mesAtual].semanas.forEach((s, idx) => { selectDest.innerHTML += `<option value="${idx}">${s.nome || ('Semana ' + (idx + 1))} (${s.periodo})</option>`; });
             selectDest.value = origemIdx;
             document.getElementById('transacaoTipo').value = 'saida'; verificarTipoTransacao('saida');
             if(itemIndex !== null) {
                 let item = origemIdx === -1 ? dadosApp[mesAtual].gaveta[itemIndex] : dadosApp[mesAtual].semanas[origemIdx].itens[itemIndex];
                 document.getElementById('tituloModalTransacao').innerText = "Editar Transação";
-                document.getElementById('transacaoDesc').value = item.desc; document.getElementById('transacaoValor').value = item.valor; document.getElementById('transacaoTipo').value = item.tipo || 'saida';
+                document.getElementById('transacaoDesc').value = item.desc; document.getElementById('transacaoValor').value = formatarMoeda(item.valor); document.getElementById('transacaoTipo').value = item.tipo || 'saida';
                 verificarTipoTransacao(item.tipo || 'saida');
             } else {
                 document.getElementById('tituloModalTransacao').innerText = "Adicionar Conta / Transação";
@@ -904,11 +988,11 @@
             const origemIdx = parseInt(document.getElementById('transacaoSemanaIdx').value);
             const itemIdx = document.getElementById('transacaoItemIdx').value;
             const desc = document.getElementById('transacaoDesc').value;
-            const valor = parseFloat(document.getElementById('transacaoValor').value);
+            const valor = parseMoeda(document.getElementById('transacaoValor').value);
             const tipo = document.getElementById('transacaoTipo').value;
             const destinoIdx = parseInt(document.getElementById('transacaoSemanaDestino').value);
             const quadroId = document.getElementById('transacaoQuadroReserva').value;
-            if(!desc || isNaN(valor)) return alert('Preencha corretamente.');
+            if(!desc || isNaN(valor) || valor <= 0) return alert('Preencha corretamente.');
 
             if (tipo === 'aplicacao') {
                 let q = quadrosReservasApp.find(item => item.id === quadroId);
@@ -958,19 +1042,34 @@
             dadosApp[id] = {
                 nomeExibicao: nome, tituloAlerta: `${nome}: Planejamento`, textoAlerta: "Organize seus gastos.",
                 gaveta: [],
-                semanas: [{periodo:"01 a 07", nome:"1ª", itens:[]}, {periodo:"08 a 15", nome:"2ª", itens:[]}, {periodo:"16 a 22", nome:"3ª", itens:[]}, {periodo:"23 a 30", nome:"4ª", itens:[]}]
+                semanas: [
+                    { periodo: "01 a 07", nome: "1ª Semana", itens: [] },
+                    { periodo: "08 a 15", nome: "2ª Semana", itens: [] },
+                    { periodo: "16 a 22", nome: "3ª Semana", itens: [] },
+                    { periodo: "23 a 30", nome: "4ª Semana", itens: [] }
+                ]
             };
             sincronizarMesCompleto(id);
             mesAtual = id; fecharModalNovoMes(); salvarTudo();
         }
 
-        function abrirModalSemanaExtra() { document.getElementById('modalSemanaExtra').classList.remove('hidden'); document.getElementById('modalSemanaExtra').classList.add('flex'); }
-        function fecharModalSemanaExtra() { document.getElementById('modalSemanaExtra').classList.remove('flex'); document.getElementById('modalSemanaExtra').classList.add('hidden'); }
+        function abrirModalSemanaExtra() {
+            document.getElementById('inputNomeExtra').value = `${dadosApp[mesAtual].semanas.length + 1}ª Semana`;
+            document.getElementById('inputPeriodoExtra').value = '';
+            document.getElementById('modalSemanaExtra').classList.remove('hidden'); 
+            document.getElementById('modalSemanaExtra').classList.add('flex'); 
+        }
+        function fecharModalSemanaExtra() { 
+            document.getElementById('modalSemanaExtra').classList.remove('flex'); 
+            document.getElementById('modalSemanaExtra').classList.add('hidden'); 
+        }
         function confirmarSemanaExtra() {
-            let p = document.getElementById('inputPeriodoExtra').value;
-            if(!p) return;
-            dadosApp[mesAtual].semanas.push({ periodo: p, nome: `Extra`, itens: [] });
-            fecharModalSemanaExtra(); salvarTudo();
+            let nome = document.getElementById('inputNomeExtra').value.trim();
+            let p = document.getElementById('inputPeriodoExtra').value.trim();
+            if(!p) return alert('Informe o período da semana.');
+            dadosApp[mesAtual].semanas.push({ periodo: p, nome: nome || `Semana`, itens: [] });
+            fecharModalSemanaExtra(); 
+            salvarTudo();
         }
 
         function abrirModalParcelado(id = null) {
@@ -984,7 +1083,7 @@
                     document.getElementById('tituloModalParcelado').innerText = 'Editar Parcela / Assinatura';
                     document.getElementById('parcIdEdicao').value = p.id;
                     document.getElementById('parcDesc').value = p.desc;
-                    document.getElementById('parcValor').value = p.valor;
+                    document.getElementById('parcValor').value = formatarMoeda(p.valor);
                     document.getElementById('parcDestino').value = p.destino;
                     document.getElementById('parcInicio').value = p.inicio || '';
                     document.getElementById('parcFim').value = p.fim || '';
@@ -1005,11 +1104,11 @@
         function salvarParcelado() {
             let idEdicao = document.getElementById('parcIdEdicao').value;
             let desc = document.getElementById('parcDesc').value;
-            let valor = parseFloat(document.getElementById('parcValor').value);
+            let valor = parseMoeda(document.getElementById('parcValor').value);
             let destino = document.getElementById('parcDestino').value;
             let inicio = document.getElementById('parcInicio').value;
             let fim = document.getElementById('parcFim').value;
-            if(!desc || isNaN(valor)) return alert('Preencha a descrição e o valor corretamente.');
+            if(!desc || isNaN(valor) || valor <= 0) return alert('Preencha a descrição e o valor corretamente.');
 
             if(idEdicao !== '') {
                 let p = parceladosApp.find(x => x.id == idEdicao);
@@ -1034,7 +1133,7 @@
                     <tr class="border-b hover:bg-slate-50">
                         <td class="p-2.5 font-medium text-slate-800">${p.desc}</td>
                         <td class="p-2.5 text-slate-600">${p.destino}</td>
-                        <td class="p-2.5 font-semibold text-slate-800">R$ ${(p.valor || 0).toFixed(2).replace('.', ',')}</td>
+                        <td class="p-2.5 font-semibold text-slate-800">R$ ${formatarMoeda(p.valor)}</td>
                         <td class="p-2.5 text-slate-500">${validadeTxt}</td>
                         <td class="p-2.5 text-center">
                             <button onclick="abrirModalParcelado(${p.id})" class="text-slate-400 hover:text-indigo-600 px-1.5" title="Editar"><i class="fa-solid fa-pen text-xs"></i></button>
@@ -1057,13 +1156,13 @@
             if(quadrosReservasApp.length === 0) { grid.innerHTML = `<div class="col-span-2 text-center py-8 text-slate-400 text-xs">Nenhum quadro de reserva.</div>`; return; }
             quadrosReservasApp.forEach(q => {
                 let meta = q.meta > 0 ? q.meta : 1; let perc = Math.min(100, (q.saldo / meta) * 100);
-                grid.innerHTML += `<div class="bg-white p-4 rounded-xl border shadow-sm space-y-3"><div class="flex justify-between items-center"><h4 class="font-bold text-sm">${q.nome}</h4><div class="flex gap-1"><button onclick="abrirModalMovQuadro('${q.id}','deposito')" class="bg-emerald-600 text-white text-[10px] px-2 py-1 rounded">+ Depósito</button><button onclick="abrirModalMovQuadro('${q.id}','retirada')" class="bg-rose-600 text-white text-[10px] px-2 py-1 rounded">- Retirada</button><button onclick="quadrosReservasApp=quadrosReservasApp.filter(x=>x.id!='${q.id}');salvarTudo();" class="text-rose-500 px-1 text-xs"><i class="fa-solid fa-trash"></i></button></div></div><div class="flex justify-between items-end"><div><span class="text-[10px] text-slate-400 block uppercase font-bold">Saldo</span><span class="text-xl font-extrabold text-indigo-900">R$ ${(q.saldo || 0).toFixed(2).replace('.', ',')}</span></div><span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">Meta: R$ ${(q.meta || 0).toFixed(2).replace('.', ',')} (${perc.toFixed(1)}%)</span></div><div class="w-full bg-slate-100 rounded-full h-2.5"><div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${perc}%"></div></div></div>`;
+                grid.innerHTML += `<div class="bg-white p-4 rounded-xl border shadow-sm space-y-3"><div class="flex justify-between items-center"><h4 class="font-bold text-sm">${q.nome}</h4><div class="flex gap-1"><button onclick="abrirModalMovQuadro('${q.id}','deposito')" class="bg-emerald-600 text-white text-[10px] px-2 py-1 rounded">+ Depósito</button><button onclick="abrirModalMovQuadro('${q.id}','retirada')" class="bg-rose-600 text-white text-[10px] px-2 py-1 rounded">- Retirada</button><button onclick="quadrosReservasApp=quadrosReservasApp.filter(x=>x.id!='${q.id}');salvarTudo();" class="text-rose-500 px-1 text-xs"><i class="fa-solid fa-trash"></i></button></div></div><div class="flex justify-between items-end"><div><span class="text-[10px] text-slate-400 block uppercase font-bold">Saldo</span><span class="text-xl font-extrabold text-indigo-900">R$ ${formatarMoeda(q.saldo)}</span></div><span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">Meta: R$ ${formatarMoeda(q.meta)} (${perc.toFixed(1)}%)</span></div><div class="w-full bg-slate-100 rounded-full h-2.5"><div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${perc}%"></div></div></div>`;
             });
         }
         function abrirModalNovoQuadroReserva() { document.getElementById('modalNovoQuadroReserva').classList.remove('hidden'); document.getElementById('modalNovoQuadroReserva').classList.add('flex'); }
         function fecharModalNovoQuadroReserva() { document.getElementById('modalNovoQuadroReserva').classList.remove('hidden'); document.getElementById('modalNovoQuadroReserva').classList.add('hidden'); }
         function salvarNovoQuadroReserva() {
-            let nome = document.getElementById('novoQuadroNome').value; let meta = parseFloat(document.getElementById('novoQuadroMeta').value)||0; let saldo = parseFloat(document.getElementById('novoQuadroSaldo').value)||0;
+            let nome = document.getElementById('novoQuadroNome').value; let meta = parseMoeda(document.getElementById('novoQuadroMeta').value); let saldo = parseMoeda(document.getElementById('novoQuadroSaldo').value);
             if(!nome) return; quadrosReservasApp.push({ id: 'res_'+Date.now(), nome, saldo, meta }); fecharModalNovoQuadroReserva(); salvarTudo();
         }
         function abrirModalMovQuadro(id, tipo) {
@@ -1074,8 +1173,8 @@
         }
         function fecharModalMovQuadroReserva() { document.getElementById('modalMovQuadroReserva').classList.remove('flex'); document.getElementById('modalMovQuadroReserva').classList.add('hidden'); }
         function confirmarMovQuadroReserva() {
-            let id = document.getElementById('idQuadroAlvo').value; let tipo = document.getElementById('tipoMovQuadro').value; let val = parseFloat(document.getElementById('valorMovQuadro').value); let desc = document.getElementById('descMovQuadro').value || 'Aporte';
-            let q = quadrosReservasApp.find(x => x.id === id); if(!q || isNaN(val)) return;
+            let id = document.getElementById('idQuadroAlvo').value; let tipo = document.getElementById('tipoMovQuadro').value; let val = parseMoeda(document.getElementById('valorMovQuadro').value); let desc = document.getElementById('descMovQuadro').value || 'Aporte';
+            let q = quadrosReservasApp.find(x => x.id === id); if(!q || isNaN(val) || val <= 0) return;
             if(tipo === 'deposito') { q.saldo += val; dadosApp[mesAtual].gaveta.push({desc:`[Reserva+] ${q.nome}: ${desc}`, valor:val, tipo:'saida', pago:false}); }
             else { if(val > q.saldo) return alert('Saldo insuficiente.'); q.saldo -= val; dadosApp[mesAtual].gaveta.push({desc:`[Reserva-] ${q.nome}: ${desc}`, valor:val, tipo:'entra', pago:false}); }
             fecharModalMovQuadroReserva(); salvarTudo();
@@ -1083,17 +1182,17 @@
 
         function renderizarAdmin() {
             const tbFixos = document.getElementById('tabelaAdminFixos'); tbFixos.innerHTML = '';
-            configFixosPadrao.forEach((item, idx) => { tbFixos.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2">${item.desc}</td><td class="p-2 font-semibold">R$ ${(item.valor || 0).toFixed(2).replace('.', ',')}</td><td class="p-2 text-center"><button onclick="configFixosPadrao.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
+            configFixosPadrao.forEach((item, idx) => { tbFixos.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2">${item.desc}</td><td class="p-2 font-semibold">R$ ${formatarMoeda(item.valor)}</td><td class="p-2 text-center"><button onclick="configFixosPadrao.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
             const tbOrc = document.getElementById('tabelaAdminOrcamentos'); tbOrc.innerHTML = '';
-            configOrcamentos.forEach((o, idx) => { tbOrc.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2"><b>${o.desc}</b> (${o.cartao}): R$ ${(o.valor || 0).toFixed(2).replace('.', ',')}</td><td class="p-2 text-center"><button onclick="configOrcamentos.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
+            configOrcamentos.forEach((o, idx) => { tbOrc.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2"><b>${o.desc}</b> (${o.cartao}): R$ ${formatarMoeda(o.valor)}</td><td class="p-2 text-center"><button onclick="configOrcamentos.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
             const tbCartoes = document.getElementById('tabelaAdminCartoes'); tbCartoes.innerHTML = '';
-            configCartoes.forEach((c, idx) => { tbCartoes.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2">${c.nome} (Lim: R$ ${(c.limite || 0).toFixed(2).replace('.', ',')})</td><td class="p-2 text-center"><button onclick="configCartoes.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
+            configCartoes.forEach((c, idx) => { tbCartoes.innerHTML += `<tr class="hover:bg-slate-50"><td class="p-2">${c.nome} (Lim: R$ ${formatarMoeda(c.limite)})</td><td class="p-2 text-center"><button onclick="configCartoes.splice(${idx},1);salvarTudo();" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></td></tr>`; });
         }
         function abrirModalAdminItem() { document.getElementById('modalAdminItem').classList.remove('hidden'); document.getElementById('modalAdminItem').classList.add('flex'); }
         function fecharModalAdminItem() { document.getElementById('modalAdminItem').classList.remove('hidden'); document.getElementById('modalAdminItem').classList.add('hidden'); }
         function salvarAdminItem() {
-            let desc = document.getElementById('adminItemDesc').value; let valor = parseFloat(document.getElementById('adminItemValor').value); let tipo = document.getElementById('adminItemTipo').value;
-            if(!desc || isNaN(valor)) return; configFixosPadrao.push({desc, valor, tipo}); fecharModalAdminItem(); salvarTudo();
+            let desc = document.getElementById('adminItemDesc').value; let valor = parseMoeda(document.getElementById('adminItemValor').value); let tipo = document.getElementById('adminItemTipo').value;
+            if(!desc || isNaN(valor) || valor <= 0) return; configFixosPadrao.push({desc, valor, tipo}); fecharModalAdminItem(); salvarTudo();
         }
         function abrirModalAdminOrcamento() {
             document.getElementById('adminOrcCartao').innerHTML = configCartoes.map(c=>`<option value="${c.nome}">${c.nome}</option>`).join('');
@@ -1101,14 +1200,14 @@
         }
         function fecharModalAdminOrcamento() { document.getElementById('modalAdminOrcamento').classList.remove('hidden'); document.getElementById('modalAdminOrcamento').classList.add('hidden'); }
         function salvarAdminOrcamento() {
-            let desc = document.getElementById('adminOrcDesc').value; let valor = parseFloat(document.getElementById('adminOrcValor').value); let cartao = document.getElementById('adminOrcCartao').value; let inicio = document.getElementById('adminOrcInicio').value; let fim = document.getElementById('adminOrcFim').value;
-            if(!desc || isNaN(valor)) return; configOrcamentos.push({id:Date.now(), desc, valor, cartao, inicio, fim}); fecharModalAdminOrcamento(); salvarTudo();
+            let desc = document.getElementById('adminOrcDesc').value; let valor = parseMoeda(document.getElementById('adminOrcValor').value); let cartao = document.getElementById('adminOrcCartao').value; let inicio = document.getElementById('adminOrcInicio').value; let fim = document.getElementById('adminOrcFim').value;
+            if(!desc || isNaN(valor) || valor <= 0) return; configOrcamentos.push({id:Date.now(), desc, valor, cartao, inicio, fim}); fecharModalAdminOrcamento(); salvarTudo();
         }
         function abrirModalAdminCartao() { document.getElementById('modalAdminCartao').classList.remove('hidden'); document.getElementById('modalAdminCartao').classList.add('flex'); }
         function fecharModalAdminCartao() { document.getElementById('modalAdminCartao').classList.remove('hidden'); document.getElementById('modalAdminCartao').classList.add('hidden'); }
         function salvarAdminCartao() {
-            let nome = document.getElementById('adminCartaoNome').value; let limite = parseFloat(document.getElementById('adminCartaoLimite').value); let semanaTeto = parseInt(document.getElementById('adminCartaoSemanaTeto').value); let cor = document.getElementById('adminCartaoCor').value;
-            if(!nome || isNaN(limite)) return; configCartoes.push({id:Date.now(), nome, limite, semanaTeto, cor}); fecharModalAdminCartao(); salvarTudo();
+            let nome = document.getElementById('adminCartaoNome').value; let limite = parseMoeda(document.getElementById('adminCartaoLimite').value); let semanaTeto = parseInt(document.getElementById('adminCartaoSemanaTeto').value); let cor = document.getElementById('adminCartaoCor').value;
+            if(!nome || isNaN(limite) || limite <= 0) return; configCartoes.push({id:Date.now(), nome, limite, semanaTeto, cor}); fecharModalAdminCartao(); salvarTudo();
         }
 
         function renderizarApp() {
@@ -1122,7 +1221,7 @@
                 <li draggable="true" ondragstart="drag(event, 'gaveta', -1, ${itemIdx})" class="py-2 px-2 bg-white rounded border shadow-sm flex items-center justify-between text-xs gap-2 cursor-grab">
                     <span class="truncate font-medium">${item.desc}</span>
                     <div class="flex items-center gap-1.5 whitespace-nowrap">
-                        <span class="font-semibold ${item.tipo === 'entra' ? 'text-emerald-600' : ''}">${item.tipo === 'entra'?'+':''}R$ ${(item.valor || 0).toFixed(2).replace('.', ',')}</span>
+                        <span class="font-semibold ${item.tipo === 'entra' ? 'text-emerald-600' : ''}">${item.tipo === 'entra'?'+':''}R$ ${formatarMoeda(item.valor)}</span>
                         <button onclick="abrirModalTransacao(-1, ${itemIdx})" class="text-slate-400 hover:text-indigo-600 px-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
                         <button onclick="excluirTransacao(-1, ${itemIdx})" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-[10px]"></i></button>
                     </div>
@@ -1146,7 +1245,7 @@
                                 <span class="${item.pago ? 'line-through text-slate-400' : ''} truncate font-medium">${item.desc}</span>
                             </div>
                             <div class="flex items-center gap-1.5 whitespace-nowrap">
-                                <span class="font-semibold ${item.tipo === 'entra'||item.tipo==='resgate'?'text-emerald-600':''}">${item.tipo==='entra'||item.tipo==='resgate'?'+':''}R$ ${val.toFixed(2).replace('.', ',')}</span>
+                                <span class="font-semibold ${item.tipo === 'entra'||item.tipo==='resgate'?'text-emerald-600':''}">${item.tipo==='entra'||item.tipo==='resgate'?'+':''}R$ ${formatarMoeda(val)}</span>
                                 <button onclick="abrirModalTransacao(${semIdx}, ${itemIdx})" class="text-slate-400 hover:text-indigo-600 px-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
                                 <button onclick="excluirTransacao(${semIdx}, ${itemIdx})" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-[10px]"></i></button>
                             </div>
@@ -1160,11 +1259,19 @@
                 let sobraSemana = (entraSemana - saidaSemana) + saldoAcumuladoCascata;
                 saldoAcumuladoCascata = sobraSemana; 
 
+                let nomeSemanaExib = sem.nome || `Semana ${semIdx + 1}`;
+
                 gridSemanas.innerHTML += `
                     <div class="bg-white rounded-xl border shadow-sm overflow-hidden flex flex-col">
                         <div class="bg-slate-100 p-3 border-b flex justify-between items-center">
-                            <div><span class="text-[10px] uppercase font-bold text-slate-500">Semana ${semIdx + 1}</span><h4 class="text-xs font-bold">${sem.periodo}</h4></div>
-                            <div class="text-right"><span class="text-[10px] text-slate-400 block">Sobra Acumulada</span><span class="text-xs font-bold ${sobraSemana>=0?'text-emerald-600':'text-rose-600'}">R$ ${sobraSemana.toFixed(2).replace('.', ',')}</span></div>
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-slate-500">${nomeSemanaExib}</span>
+                                <h4 class="text-xs font-bold flex items-center gap-1">
+                                    ${sem.periodo} 
+                                    <button onclick="abrirModalEditarSemana(${semIdx})" class="text-slate-400 hover:text-indigo-600 ml-1" title="Editar Semana"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                                </h4>
+                            </div>
+                            <div class="text-right"><span class="text-[10px] text-slate-400 block">Sobra Acumulada</span><span class="text-xs font-bold ${sobraSemana>=0?'text-emerald-600':'text-rose-600'}">R$ ${formatarMoeda(sobraSemana)}</span></div>
                         </div>
                         <div class="p-3 flex-1 flex flex-col justify-between kanban-drop-zone" ondragover="allowDrop(event)" ondragleave="leaveDrop(event)" ondrop="drop(event, ${semIdx})">
                             <ul class="space-y-2 max-h-56 overflow-y-auto pr-1">${itensHtml}</ul>
@@ -1174,9 +1281,9 @@
                 `;
             });
 
-            document.getElementById('resumoEntradas').innerText = `R$ ${totalEntradas.toFixed(2).replace('.', ',')}`;
-            document.getElementById('resumoSaidas').innerText = `R$ ${totalSaidas.toFixed(2).replace('.', ',')}`;
-            document.getElementById('resumoSobra').innerText = `R$ ${(totalEntradas - totalSaidas).toFixed(2).replace('.', ',')}`;
+            document.getElementById('resumoEntradas').innerText = `R$ ${formatarMoeda(totalEntradas)}`;
+            document.getElementById('resumoSaidas').innerText = `R$ ${formatarMoeda(totalSaidas)}`;
+            document.getElementById('resumoSobra').innerText = `R$ ${formatarMoeda(totalEntradas - totalSaidas)}`;
         }
     </script>
 </body>
