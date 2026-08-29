@@ -457,7 +457,10 @@
         let parceladosApp = [];
         let quadrosReservasApp = [];
         let dadosApp = {};
-        let mesAtual = '';
+        let mesAtual = (() => {
+            const agora = new Date();
+            return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
+        })();
 
         function mascaraMoeda(input) {
             let valor = input.value.replace(/\D/g, '');
@@ -931,6 +934,108 @@
         }
 
 
+        function obterPagamentosFatura(mesFaturaId, cartaoNome) {
+            const pagamentos = [];
+            Object.keys(dadosApp).forEach(mKey => {
+                const lista = dadosApp[mKey][`pagamentos${cartaoNome}`] || [];
+                lista.forEach((p, index) => {
+                    if (p.faturaMes === mesFaturaId) {
+                        pagamentos.push({ ...p, _mesDados: mKey, _index: index });
+                    }
+                });
+            });
+            return pagamentos.sort((a, b) => String(a.data || '').localeCompare(String(b.data || '')));
+        }
+
+        function editarPagamentoFatura(cartaoNome, mesFaturaId, pagamentoId) {
+            let encontrado = null;
+
+            Object.keys(dadosApp).some(mKey => {
+                const chave = `pagamentos${cartaoNome}`;
+                const lista = dadosApp[mKey][chave] || [];
+                const idx = lista.findIndex(p => p.id === pagamentoId);
+                if (idx >= 0) {
+                    encontrado = { mesDados: mKey, chave, idx, pagamento: lista[idx] };
+                    return true;
+                }
+                return false;
+            });
+
+            if (!encontrado) return alert('Pagamento não encontrado.');
+
+            const p = encontrado.pagamento;
+            const valorStr = prompt(
+                `Novo valor do pagamento da fatura ${cartaoNome}:`,
+                formatarMoeda(p.valor)
+            );
+            if (valorStr === null) return;
+
+            const valor = parseMoeda(valorStr);
+            if (!valor || valor <= 0) return alert('Informe um valor válido.');
+
+            const dataAtual = p.data
+                ? (() => {
+                    const [a, m, d] = p.data.split('-');
+                    return `${d}/${m}/${a}`;
+                })()
+                : '';
+
+            const dataStr = prompt(
+                'Nova data do pagamento (DD/MM/AAAA):',
+                dataAtual
+            );
+            if (dataStr === null) return;
+
+            let dataISO = p.data || '';
+            if (dataStr.trim()) {
+                const match = dataStr.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                if (!match) return alert('Use o formato DD/MM/AAAA.');
+
+                const dia = Number(match[1]);
+                const mes = Number(match[2]);
+                const ano = Number(match[3]);
+                const d = new Date(ano, mes - 1, dia);
+
+                if (d.getFullYear() !== ano || d.getMonth() !== mes - 1 || d.getDate() !== dia) {
+                    return alert('Informe uma data válida no formato DD/MM/AAAA.');
+                }
+
+                dataISO = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+            }
+
+            const fatura = calcularFaturaMes(mesFaturaId, {nome: cartaoNome});
+            const totalPagoSemEste = obterTotalPagoFatura(mesFaturaId, cartaoNome) - (p.valor || 0);
+            if (totalPagoSemEste + valor > fatura + 0.01) {
+                return alert(`O total pago não pode ultrapassar a fatura de R$ ${formatarMoeda(fatura)}.`);
+            }
+
+            p.valor = valor;
+            p.data = dataISO;
+            p.dataExibicao = dataStr.trim();
+
+            salvarTudo();
+        }
+
+        function excluirPagamentoFatura(cartaoNome, pagamentoId) {
+            if (!confirm('Excluir este pagamento da fatura?')) return;
+
+            let removido = false;
+            Object.keys(dadosApp).some(mKey => {
+                const chave = `pagamentos${cartaoNome}`;
+                const lista = dadosApp[mKey][chave] || [];
+                const idx = lista.findIndex(p => p.id === pagamentoId);
+                if (idx >= 0) {
+                    lista.splice(idx, 1);
+                    dadosApp[mKey][chave] = lista;
+                    removido = true;
+                    return true;
+                }
+                return false;
+            });
+
+            if (removido) salvarTudo();
+        }
+
         function obterTotalPagoFatura(mesFaturaId, cartaoNome) {
             let total = 0;
             Object.keys(dadosApp).forEach(mKey => {
@@ -1159,6 +1264,25 @@
                                     <span><strong class="text-slate-700">Realizado:</strong> R$ ${formatarMoeda(totalRealizado)}</span>
                                     <span><strong class="text-slate-700">Pago:</strong> R$ ${formatarMoeda(obterTotalPagoFatura(mesAtual, cartao.nome))}</span>
                                     <span><strong class="text-slate-700">Restante:</strong> R$ ${formatarMoeda(Math.max(0, faturaPrevista - obterTotalPagoFatura(mesAtual, cartao.nome)))}</span>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="text-[11px] font-semibold text-slate-600 mb-1">Pagamentos registrados</div>
+                                    <div class="space-y-1">
+                                        ${obterPagamentosFatura(mesAtual, cartao.nome).length
+                                            ? obterPagamentosFatura(mesAtual, cartao.nome).map(p => `
+                                                <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[11px]">
+                                                    <span>
+                                                        <strong class="text-emerald-700">R$ ${formatarMoeda(p.valor)}</strong>
+                                                        ${p.data ? ` • ${p.dataExibicao || (() => { const [a,m,d]=p.data.split('-'); return `${d}/${m}/${a}`; })()}` : ''}
+                                                    </span>
+                                                    <span class="flex gap-1">
+                                                        <button onclick="editarPagamentoFatura('${cartao.nome}', '${mesAtual}', ${p.id})" class="text-slate-400 hover:text-indigo-600 px-1" title="Editar pagamento"><i class="fa-solid fa-pen"></i></button>
+                                                        <button onclick="excluirPagamentoFatura('${cartao.nome}', ${p.id})" class="text-slate-400 hover:text-rose-600 px-1" title="Excluir pagamento"><i class="fa-solid fa-xmark"></i></button>
+                                                    </span>
+                                                </div>
+                                            `).join('')
+                                            : '<span class="text-[10px] text-slate-400">Nenhum pagamento registrado.</span>'}
+                                    </div>
                                 </div>
                                 <button onclick="abrirModalPagamentoFatura('${cartao.nome}', '${mesAtual}')"
                                     class="mb-3 w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-semibold">
