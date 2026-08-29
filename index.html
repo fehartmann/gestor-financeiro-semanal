@@ -345,6 +345,10 @@
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Valor (R$)</label><input type="text" id="parcValor" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="0,00" oninput="mascaraMoeda(this)"></div>
             <div><label class="text-xs font-semibold text-slate-600 block mb-1">Destino</label><select id="parcDestino" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></select></div>
             <div class="grid grid-cols-2 gap-2">
+                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Primeira parcela</label><input type="month" id="parcPrimeira" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
+                <div><label class="text-xs font-semibold text-slate-600 block mb-1">Quantidade de parcelas</label><input type="number" min="1" step="1" id="parcQtd" class="w-full border border-slate-300 rounded-lg p-2 text-sm" placeholder="Ex.: 6"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
                 <div><label class="text-xs font-semibold text-slate-600 block mb-1">Início (Opcional)</label><input type="month" id="parcInicio" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
                 <div><label class="text-xs font-semibold text-slate-600 block mb-1">Fim (Deixe em branco p/ contínuo)</label><input type="month" id="parcFim" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></div>
             </div>
@@ -657,8 +661,17 @@
                     if (dest === nomeCartaoBusca) {
                         if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
                             let descParcela = `[Parcela] ${p.desc}`;
-                            if (!itensAtuais.some(item => item.desc === descParcela)) {
-                                itensAtuais.push({ id: Date.now() + Math.random(), desc: descParcela, orcado: p.valor, real: p.valor });
+                            let parcelaNumero = null;
+                            if (p.primeiraParcela && p.quantidadeParcelas) {
+                                let [ay, am] = p.primeiraParcela.split('-').map(Number);
+                                let [by, bm] = mesId.split('-').map(Number);
+                                parcelaNumero = (by * 12 + bm) - (ay * 12 + am) + 1;
+                                if (parcelaNumero < 1 || parcelaNumero > p.quantidadeParcelas) parcelaNumero = null;
+                            }
+                            let rotuloParcela = parcelaNumero ? ` ${parcelaNumero}/${p.quantidadeParcelas}` : '';
+                            let descFinal = `${descParcela}${rotuloParcela}`;
+                            if (!itensAtuais.some(item => item.desc === descFinal)) {
+                                itensAtuais.push({ id: Date.now() + Math.random(), desc: descFinal, orcado: p.valor, real: p.valor, parcelamentoId: p.id, parcelaNumero });
                             }
                         }
                     }
@@ -806,37 +819,107 @@
             salvarTudo();
         }
 
+        function obterItensCartaoMes(mesId, nomeCartao) {
+            if (!dadosApp[mesId]) return [];
+            return dadosApp[mesId][`itens${nomeCartao}`] || [];
+        }
+
+        function calcularFaturaMes(mesId, cartao) {
+            const itens = obterItensCartaoMes(mesId, cartao.nome);
+            return itens.reduce((acc, i) => acc + (i.real || 0), 0);
+        }
+
+        function registrarPagamentoFatura(cartaoNome, mesFaturaId) {
+            const mesPagamento = mesAtual;
+            const chave = `pagamentos${cartaoNome}`;
+            if (!dadosApp[mesPagamento]) return;
+
+            if (!dadosApp[mesPagamento][chave]) dadosApp[mesPagamento][chave] = [];
+
+            const valorAtual = calcularFaturaMes(mesFaturaId, {nome: cartaoNome});
+            if (valorAtual <= 0) return alert('Não há valor de fatura para registrar.');
+
+            const valorStr = prompt(`Valor pago da fatura ${cartaoNome}:`, formatarMoeda(valorAtual));
+            if (valorStr === null) return;
+            const valor = parseMoeda(valorStr);
+            if (!valor || valor <= 0) return alert('Informe um valor válido.');
+
+            const dataStr = prompt('Data do pagamento (AAAA-MM-DD):', `${mesPagamento}-01`);
+            if (dataStr === null) return;
+            if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dataStr)) return alert('Use o formato AAAA-MM-DD.');
+
+            dadosApp[mesPagamento][chave].push({
+                id: Date.now(),
+                faturaMes: mesFaturaId,
+                valor,
+                data: dataStr,
+                pagoAntecipado: true
+            });
+
+            salvarTudo();
+        }
+
+        function obterTotalPagoFatura(mesFaturaId, cartaoNome) {
+            let total = 0;
+            Object.keys(dadosApp).forEach(mKey => {
+                const pagamentos = dadosApp[mKey][`pagamentos${cartaoNome}`] || [];
+                pagamentos.forEach(p => {
+                    if (p.faturaMes === mesFaturaId) total += (p.valor || 0);
+                });
+            });
+            return total;
+        }
+
+        function removerPagamentosGeradosDaFatura(data, cartaoNome, mesFaturaId) {
+            // A fatura é derivada dos lançamentos. Pagamentos são registros separados.
+            // Não removemos pagamentos reais quando a fatura é recalculada.
+            return data;
+        }
+
         function garantirFaturasNasSemanas() {
             const data = dadosApp[mesAtual];
             if (!data) return;
 
-            let mesAnteriorId = obterMesAnterior(mesAtual);
-            let dadosMesAnterior = dadosApp[mesAnteriorId];
-            
+            const mesAnteriorId = obterMesAnterior(mesAtual);
+            const dadosMesAnterior = dadosApp[mesAnteriorId];
+
             configCartoes.forEach(cartao => {
-                let chaveItens = `itens${cartao.nome}`;
-                // Puxa os gastos do MÊS ANTERIOR para aparecerem como Fatura no Kanban do MÊS ATUAL
-                let itensFatura = dadosMesAnterior && dadosMesAnterior[chaveItens] ? dadosMesAnterior[chaveItens] : [];
-                let totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
-                let nomeItemCard = `Cartão ${cartao.nome}`;
-                let semIdx = Math.min(cartao.semanaTeto, data.semanas.length - 1);
-                
-                let existeFaturaEmAlgumaSemana = false;
+                const chaveItens = `itens${cartao.nome}`;
+                const itensFatura = dadosMesAnterior && dadosMesAnterior[chaveItens]
+                    ? dadosMesAnterior[chaveItens]
+                    : [];
+
+                const totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
+                const nomeItemCard = `Cartão ${cartao.nome}`;
+
+                // A fatura automática pertence ao mês atual porque é paga neste mês.
+                // Primeiro remove somente faturas automáticas antigas desse cartão.
                 data.semanas.forEach(s => {
-                    if (s.itens.some(it => it.desc.startsWith(nomeItemCard))) existeFaturaEmAlgumaSemana = true;
+                    s.itens = (s.itens || []).filter(it => !it._faturaAutomatica || it.cartaoNome !== cartao.nome);
                 });
 
-                if (!existeFaturaEmAlgumaSemana && data.semanas[semIdx] && totalRealFatura > 0) {
-                    data.semanas[semIdx].itens.push({ desc: `${nomeItemCard} (Fatura)`, valor: totalRealFatura, tipo: 'saida', pago: false });
-                } else if (existeFaturaEmAlgumaSemana && totalRealFatura > 0) {
-                    data.semanas.forEach(s => {
-                        s.itens.forEach(it => {
-                            if (it.desc.startsWith(nomeItemCard)) it.valor = totalRealFatura;
+                const semIdx = Math.min(cartao.semanaTeto, data.semanas.length - 1);
+
+                if (totalRealFatura > 0 && data.semanas[semIdx]) {
+                    const totalPago = obterTotalPagoFatura(mesAnteriorId, cartao.nome);
+                    const restante = Math.max(0, totalRealFatura - totalPago);
+
+                    // Só a parte ainda não paga entra como saída no Kanban.
+                    if (restante > 0) {
+                        data.semanas[semIdx].itens.push({
+                            desc: `${nomeItemCard} (Fatura)`,
+                            valor: restante,
+                            tipo: 'saida',
+                            pago: totalPago >= totalRealFatura,
+                            _faturaAutomatica: true,
+                            cartaoNome: cartao.nome,
+                            faturaMes: mesAnteriorId
                         });
-                    });
+                    }
                 }
             });
         }
+
 
         function calcularTetosDinamicos() {
             const data = dadosApp[mesAtual];
@@ -869,7 +952,8 @@
                     ? Math.min(cartao.semanaTeto, dataProximoMes.semanas.length - 1)
                     : -1;
 
-                // Capacidade financeira da semana de pagamento, antes da nova fatura.
+                // Capacidade financeira da semana de pagamento no próximo mês,
+                // antes da fatura que será formada pelos compromissos deste mês.
                 let capacidadeSemana = 0;
 
                 if (dataProximoMes && dataProximoMes.semanas[semIdx]) {
@@ -946,7 +1030,12 @@
                                 <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mb-2">
                                     <span><strong class="text-slate-700">Total da fatura:</strong> R$ ${formatarMoeda(faturaPrevista)}</span>
                                     <span><strong class="text-slate-700">Realizado:</strong> R$ ${formatarMoeda(totalRealizado)}</span>
+                                    <span><strong class="text-slate-700">Pago:</strong> R$ ${formatarMoeda(obterTotalPagoFatura(mesAtual, cartao.nome))}</span>
                                 </div>
+                                <button onclick="registrarPagamentoFatura('${cartao.nome}', '${mesAtual}')"
+                                    class="mb-3 w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-semibold">
+                                    <i class="fa-solid fa-money-bill-wave"></i> Registrar pagamento desta fatura
+                                </button>
                                 <div class="overflow-x-auto border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
                                     <table class="w-full min-w-[520px] text-left text-xs"><thead class="bg-slate-100 text-slate-600 uppercase"><tr><th class="p-2">Desc</th><th class="p-2">Orçado</th><th class="p-2">Real</th><th class="p-2 text-center">Ações</th></tr></thead><tbody class="divide-y divide-slate-100">${linhasItens}</tbody></table>
                                 </div>
@@ -1176,6 +1265,8 @@
                     document.getElementById('parcDestino').value = p.destino;
                     document.getElementById('parcInicio').value = p.inicio || '';
                     document.getElementById('parcFim').value = p.fim || '';
+                    document.getElementById('parcPrimeira').value = p.primeiraParcela || p.inicio || '';
+                    document.getElementById('parcQtd').value = p.quantidadeParcelas || '';
                 }
             } else {
                 document.getElementById('tituloModalParcelado').innerText = 'Nova Parcela / Assinatura';
@@ -1185,6 +1276,8 @@
                 document.getElementById('parcDestino').value = 'Boleto / Gaveta';
                 document.getElementById('parcInicio').value = '';
                 document.getElementById('parcFim').value = '';
+                document.getElementById('parcPrimeira').value = '';
+                document.getElementById('parcQtd').value = '';
             }
             document.getElementById('modalParcelado').classList.remove('hidden'); document.getElementById('modalParcelado').classList.add('flex');
         }
@@ -1197,18 +1290,38 @@
             let destino = document.getElementById('parcDestino').value;
             let inicio = document.getElementById('parcInicio').value;
             let fim = document.getElementById('parcFim').value;
+            let primeiraParcela = document.getElementById('parcPrimeira').value;
+            let quantidadeParcelas = parseInt(document.getElementById('parcQtd').value, 10);
+
             if(!desc || isNaN(valor) || valor <= 0) return alert('Preencha a descrição e o valor corretamente.');
+
+            if (primeiraParcela && quantidadeParcelas > 0) {
+                // Para parcelamentos, início/fim passam a ser derivados.
+                inicio = primeiraParcela;
+                let [ano, mes] = primeiraParcela.split('-').map(Number);
+                mes += quantidadeParcelas - 1;
+                ano += Math.floor((mes - 1) / 12);
+                mes = ((mes - 1) % 12) + 1;
+                fim = `${ano}-${String(mes).padStart(2, '0')}`;
+            }
+
+            const dadosParcela = {
+                id: idEdicao !== '' ? Number(idEdicao) : Date.now(),
+                desc, valor, destino, inicio, fim,
+                primeiraParcela: primeiraParcela || inicio || '',
+                quantidadeParcelas: quantidadeParcelas > 0 ? quantidadeParcelas : null
+            };
 
             if(idEdicao !== '') {
                 let p = parceladosApp.find(x => x.id == idEdicao);
-                if(p) {
-                    p.desc = desc; p.valor = valor; p.destino = destino; p.inicio = inicio; p.fim = fim;
-                }
+                if(p) Object.assign(p, dadosParcela);
             } else {
-                parceladosApp.push({ id: Date.now(), desc, valor, destino, inicio, fim });
+                parceladosApp.push(dadosParcela);
             }
-            fecharModalParcelado(); salvarTudo();
+            fecharModalParcelado();
+            salvarTudo();
         }
+
 
         function renderizarParcelados() {
             const tbody = document.getElementById('tabelaParcelados'); tbody.innerHTML = '';
@@ -1217,7 +1330,9 @@
                 return;
             }
             parceladosApp.forEach(p => {
-                let validadeTxt = `${p.inicio || 'Início Livre'} → ${p.fim || 'Contínuo (Indeterminado)'}`;
+                let validadeTxt = p.primeiraParcela && p.quantidadeParcelas
+                    ? `${p.primeiraParcela} → ${p.quantidadeParcelas} parcelas`
+                    : `${p.inicio || 'Início Livre'} → ${p.fim || 'Contínuo (Indeterminado)'}`;
                 tbody.innerHTML += `
                     <tr class="border-b hover:bg-slate-50">
                         <td class="p-2.5 font-medium text-slate-800">${p.desc}</td>
