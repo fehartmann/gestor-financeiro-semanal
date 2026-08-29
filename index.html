@@ -893,7 +893,7 @@
             );
             if (dataStr === null) return;
 
-            const match = dataStr.trim().match(/^(\\d{2})\\/(\\d{2})\\/(\\d{4})$/);
+            const match = dataStr.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
             if (!match) {
                 return alert('Use o formato DD/MM/AAAA.');
             }
