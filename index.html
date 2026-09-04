@@ -41,10 +41,227 @@
             }
         }
 
+        html, body {
+            overflow-x: hidden;
+        }
+
+        #sistemaApp {
+            min-width: 0;
+            width: 100%;
+        }
+
+
+        @media (max-width: 640px) {
+            * { box-sizing: border-box; }
+            html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
+            body { min-width: 0; }
+
+            #sistemaApp { width: 100%; min-width: 0; }
+            header { width: 100%; }
+            header > div {
+                width: 100%;
+                min-width: 0;
+            }
+            header h1 { font-size: 1.15rem; line-height: 1.25; }
+            header > div > div:first-child p {
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            header > div > div:last-child {
+                width: 100%;
+                min-width: 0;
+                display: grid;
+                grid-template-columns: auto minmax(0, 1fr) 38px 38px;
+                gap: 6px;
+                padding: 8px;
+            }
+            header > div > div:last-child select {
+                width: 100%;
+                min-width: 0;
+                max-width: 100%;
+            }
+            header > div > div:last-child button {
+                min-height: 38px;
+            }
+            header > div > div:last-child button:nth-last-child(2),
+            header > div > div:last-child button:last-child {
+                grid-column: span 2;
+            }
+
+            nav { width: 100%; overflow: hidden; }
+            nav > div { width: max-content; min-width: 100%; }
+            nav .tab-btn {
+                flex: 0 0 auto;
+                min-width: 118px;
+                padding-left: 12px;
+                padding-right: 12px;
+                white-space: nowrap;
+            }
+
+            main {
+                width: 100%;
+                max-width: 100%;
+                min-width: 0;
+                padding: 12px;
+                overflow-x: hidden;
+                gap: 16px;
+            }
+
+            #aba-semanas,
+            #aba-cartoes,
+            #aba-parcelados,
+            #aba-reserva,
+            #aba-admin {
+                width: 100%;
+                min-width: 0;
+                max-width: 100%;
+            }
+
+            #aba-semanas > .grid:first-child {
+                grid-template-columns: 1fr;
+            }
+            #aba-semanas > .flex {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            #aba-semanas > .flex button {
+                width: 100%;
+            }
+
+            #gridSemanas {
+                width: 100%;
+                min-width: 0;
+                grid-template-columns: 1fr;
+            }
+            #gridSemanas > div {
+                width: 100%;
+                min-width: 0;
+            }
+
+            #gridCartoesDinamicos {
+                width: 100%;
+                min-width: 0;
+                grid-template-columns: 1fr;
+            }
+            #gridCartoesDinamicos > div {
+                width: 100%;
+                min-width: 0;
+            }
+            #gridCartoesDinamicos .overflow-x-auto {
+                max-width: 100%;
+                overflow-x: auto;
+            }
+            #gridCartoesDinamicos table {
+                min-width: 500px;
+            }
+
+            #aba-cartoes > .bg-blue-50 {
+                padding: 12px;
+            }
+            #aba-cartoes > .bg-blue-50 button {
+                width: 100%;
+            }
+
+            #listaGaveta {
+                max-height: none;
+            }
+
+            .kanban-drop-zone {
+                min-width: 0;
+            }
+
+            /* Modais: nunca ultrapassar a viewport. */
+            [id^="modal"] > div {
+                max-width: calc(100vw - 24px);
+            }
+        }
+
+        @media (max-width: 640px) {
+            header .max-w-7xl {
+                width: 100%;
+            }
+
+            header h1 {
+                font-size: 1.25rem;
+                line-height: 1.25;
+            }
+
+            header > div > div:first-child {
+                min-width: 0;
+            }
+
+            header > div > div:first-child p {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            header > div > div:last-child {
+                width: 100%;
+                display: grid;
+                grid-template-columns: auto minmax(0, 1fr) 38px 38px;
+                gap: 6px;
+                align-items: center;
+                padding: 8px;
+            }
+
+            header > div > div:last-child label {
+                white-space: nowrap;
+            }
+
+            header > div > div:last-child select {
+                width: 100%;
+                min-width: 0;
+                height: 38px;
+            }
+
+            header > div > div:last-child button {
+                min-width: 38px;
+                min-height: 38px;
+            }
+
+            header > div > div:last-child button:nth-last-child(2),
+            header > div > div:last-child button:last-child {
+                grid-column: span 2;
+            }
+
+            nav .tab-btn {
+                min-width: 118px;
+                flex: 0 0 auto;
+                white-space: nowrap;
+            }
+
+            main {
+                padding: 0.75rem;
+                max-width: 100%;
+            }
+
+            #aba-semanas,
+            #aba-cartoes,
+            #aba-parcelados,
+            #aba-reserva,
+            #aba-admin {
+                min-width: 0;
+                max-width: 100%;
+            }
+
+            #aba-semanas > * {
+                max-width: 100%;
+            }
+
+            .kanban-container {
+                max-width: 100%;
+                overflow-x: auto;
+            }
+        }
+
         @media (max-width: 640px) {
             main { padding: 0.75rem; }
             nav .tab-btn { min-width: 118px; flex: 0 0 auto; white-space: nowrap; }
-            #gridCartoesDinamicos { grid-template-columns: minmax(0, 1fr); }
+            #gridCartoesDinamicos { grid-template-columns: minmax(0, 1fr); width: 100%; }
             #gridCartoesDinamicos > div { min-width: 0; }
             #modalTabelaPlanilha { align-items: flex-start; }
             #modalTabelaPlanilha > div { margin-top: 1rem; max-height: calc(100vh - 2rem); padding: 1rem; }
@@ -136,14 +353,6 @@
 
         <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 overflow-y-auto space-y-6">
             <section id="aba-semanas" class="space-y-6">
-                <div id="alertaMesContainer" class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg shadow-sm flex items-start gap-3">
-                    <i class="fa-solid fa-triangle-exclamation text-amber-500 text-xl mt-0.5"></i>
-                    <div>
-                        <h3 class="font-semibold text-amber-800 text-sm" id="alertaTitulo">Planejamento do Mês</h3>
-                        <p class="text-xs text-amber-700 mt-0.5" id="alertaTexto">Organize os itens fixos da gaveta nas semanas correspondentes.</p>
-                    </div>
-                </div>
-
                 <div class="grid grid-cols-3 gap-3 sm:gap-4">
                     <div class="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm">
                         <span class="text-xs text-slate-500 block font-medium">Entradas Totais</span>
@@ -572,7 +781,11 @@
                 configFixosPadrao = []; configOrcamentos = []; configCartoes = []; parceladosApp = []; quadrosReservasApp = []; dadosApp = {};
             }
 
-            mesAtual = Object.keys(dadosApp)[0] || '';
+            const agoraSistema = new Date();
+            const mesCorrenteSistema = `${agoraSistema.getFullYear()}-${String(agoraSistema.getMonth() + 1).padStart(2, '0')}`;
+            mesAtual = dadosApp[mesCorrenteSistema]
+                ? mesCorrenteSistema
+                : (Object.keys(dadosApp).sort()[0] || '');
             if (!mesAtual) {
                 let dataHoje = new Date();
                 let ano = dataHoje.getFullYear();
@@ -582,9 +795,7 @@
                 let nomeEx = `${nomesMeses[dataHoje.getMonth()]} ${ano}`;
                 dadosApp[mesAtual] = {
                     nomeExibicao: nomeEx,
-                    tituloAlerta: `${nomeEx}: Planejamento`,
-                    textoAlerta: "Organize seus gastos.",
-                    gaveta: [],
+                                        gaveta: [],
                     semanas: [
                         { periodo: "01 a 07", nome: "1ª Semana", itens: [] },
                         { periodo: "08 a 15", nome: "2ª Semana", itens: [] },
@@ -763,7 +974,6 @@
             let novoNome = document.getElementById('inputEditarMesNome').value.trim();
             if(!novoNome) return alert('Digite um nome válido.');
             dadosApp[mesAtual].nomeExibicao = novoNome;
-            dadosApp[mesAtual].tituloAlerta = `${novoNome}: Planejamento`;
             fecharModalEditarMes();
             salvarTudo();
         }
@@ -1245,29 +1455,47 @@
                         </div>
                         <div class="p-4 space-y-4 flex-1">
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100 text-center">
-                                    <span class="text-[10px] text-indigo-700 font-bold block uppercase">Fatura prevista</span>
-                                    <span class="text-lg font-bold text-indigo-700">R$ ${formatarMoeda(faturaPrevista)}</span>
-                                    <span class="text-[10px] text-slate-500 block mt-1">${dataProximoMes ? `Pagamento em ${dataProximoMes.nomeExibicao || proximoMesId}` : 'Próximo mês não criado'}</span>
+                                <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100 text-center min-w-0">
+                                    <span class="text-[10px] text-indigo-700 font-bold block uppercase">Fatura com orçamento</span>
+                                    <span class="text-lg font-bold text-indigo-700 whitespace-nowrap">R$ ${formatarMoeda(itensMesAtual.reduce((acc, i) => acc + (i.orcado || 0), 0))}</span>
+                                    <span class="text-[10px] text-slate-500 block mt-1">Valor orçado</span>
                                 </div>
-                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
-                                    <span class="text-[10px] text-slate-600 font-bold block uppercase">Total comprometido</span>
-                                    <span class="text-lg font-bold text-slate-800">R$ ${formatarMoeda(totalComprometidoMes)}</span>
-                                    <span class="text-[10px] text-slate-500 block mt-1">Gastos + orçamento</span>
+                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center min-w-0">
+                                    <span class="text-[10px] text-slate-600 font-bold block uppercase">Fatura sem orçamento</span>
+                                    <span class="text-lg font-bold text-slate-800 whitespace-nowrap">R$ ${formatarMoeda(totalRealizado)}</span>
+                                    <span class="text-[10px] text-slate-500 block mt-1">Valor real</span>
                                 </div>
-                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center min-w-0">
                                     <span class="text-[10px] ${corTxt} font-bold block uppercase">Ainda pode gastar</span>
-                                    <span class="text-xl font-bold ${corTxt}">R$ ${formatarMoeda(tetoDisponivel)}</span>
+                                    <span class="text-xl font-bold ${corTxt} whitespace-nowrap">R$ ${formatarMoeda(tetoDisponivel)}</span>
                                     <span class="text-[10px] text-slate-500 block mt-1">${dataProximoMes ? `Saldo acumulado até a semana ${semIdx + 1}` : 'Crie o próximo mês para calcular'}</span>
                                 </div>
                             </div>
                             <div>
-                                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mb-1"><label class="text-xs font-semibold text-slate-700">Lançamentos em ${data.nomeExibicao}</label><button onclick="abrirModalGastoCartao('${cartao.nome}')" class="self-start text-xs text-indigo-600 font-semibold hover:underline whitespace-nowrap"><i class="fa-solid fa-plus"></i> Adicionar Gasto</button></div>
-                                <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mb-2">
-                                    <span><strong class="text-slate-700">Total da fatura:</strong> R$ ${formatarMoeda(faturaPrevista)}</span>
-                                    <span><strong class="text-slate-700">Realizado:</strong> R$ ${formatarMoeda(totalRealizado)}</span>
-                                    <span><strong class="text-slate-700">Pago:</strong> R$ ${formatarMoeda(obterTotalPagoFatura(mesAtual, cartao.nome))}</span>
-                                    <span><strong class="text-slate-700">Restante:</strong> R$ ${formatarMoeda(Math.max(0, faturaPrevista - obterTotalPagoFatura(mesAtual, cartao.nome)))}</span>
+                                <div class="flex flex-col gap-2 mb-2">
+                                    <label class="text-xs font-semibold text-slate-700">Lançamentos em ${data.nomeExibicao}</label>
+                                    <button onclick="abrirModalGastoCartao('${cartao.nome}')"
+                                        class="w-full py-2 border border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 rounded-lg text-xs font-semibold flex items-center justify-center gap-1">
+                                        <i class="fa-solid fa-plus"></i> Adicionar Gasto
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] mb-3">
+                                    <div class="bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-200">
+                                        <span class="block text-slate-500">Com orçamento</span>
+                                        <strong class="text-indigo-700">R$ ${formatarMoeda(itensMesAtual.reduce((acc, i) => acc + (i.orcado || 0), 0))}</strong>
+                                    </div>
+                                    <div class="bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-200">
+                                        <span class="block text-slate-500">Sem orçamento</span>
+                                        <strong class="text-slate-800">R$ ${formatarMoeda(totalRealizado)}</strong>
+                                    </div>
+                                    <div class="bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-200">
+                                        <span class="block text-slate-500">Pago</span>
+                                        <strong class="text-emerald-700">R$ ${formatarMoeda(obterTotalPagoFatura(mesAtual, cartao.nome))}</strong>
+                                    </div>
+                                    <div class="bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-200">
+                                        <span class="block text-slate-500">Restante</span>
+                                        <strong class="text-rose-600">R$ ${formatarMoeda(Math.max(0, totalRealizado - obterTotalPagoFatura(mesAtual, cartao.nome)))}</strong>
+                                    </div>
                                 </div>
                                 <div class="mb-3">
                                     <div class="text-[11px] font-semibold text-slate-600 mb-1">Pagamentos registrados</div>
@@ -1672,7 +1900,9 @@
 
         function renderizarApp() {
             const data = dadosApp[mesAtual]; if(!data) return; if(!data.gaveta) data.gaveta = [];
-            document.getElementById('alertaTitulo').innerText = data.tituloAlerta; document.getElementById('alertaTexto').innerText = data.textoAlerta;
+            // O aviso amarelo de planejamento foi removido da interface.
+            // Os campos antigos continuam nos dados para compatibilidade.
+
             calcularTetosDinamicos();
 
             document.getElementById('contadorGaveta').innerText = data.gaveta.length;
