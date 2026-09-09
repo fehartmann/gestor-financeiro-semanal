@@ -813,6 +813,11 @@
             for (let mKey in dadosApp) {
                 sincronizarMesCompleto(mKey);
             }
+            // Gera/atualiza as faturas uma única vez na preparação dos dados,
+            // nunca durante a simples renderização da tela.
+            for (let mKey in dadosApp) {
+                garantirFaturasNasSemanas(mKey);
+            }
 
             atualizarSeletorMeses();
             renderizarApp();
@@ -824,6 +829,9 @@
         async function salvarTudo() {
             for (let mKey in dadosApp) {
                 sincronizarMesCompleto(mKey);
+            }
+            for (let mKey in dadosApp) {
+                garantirFaturasNasSemanas(mKey);
             }
 
             let pacoteDados = {
@@ -1145,6 +1153,7 @@
             });
 
             fecharModalPagamentoFatura();
+            // Ao salvar, o Kanban será atualizado apenas com o valor restante da fatura.
             salvarTudo();
         }
 
@@ -1268,11 +1277,11 @@
             return data;
         }
 
-        function garantirFaturasNasSemanas() {
-            const data = dadosApp[mesAtual];
+        function garantirFaturasNasSemanas(mesId = mesAtual) {
+            const data = dadosApp[mesId];
             if (!data) return;
 
-            const mesAnteriorId = obterMesAnterior(mesAtual);
+            const mesAnteriorId = obterMesAnterior(mesId);
             const dadosMesAnterior = dadosApp[mesAnteriorId];
 
             configCartoes.forEach(cartao => {
@@ -1338,13 +1347,27 @@
                 const totalPago = obterTotalPagoFatura(mesAnteriorId, cartao.nome);
                 const restante = Math.max(0, totalRealFatura - totalPago);
 
+                // A fatura no Kanban representa APENAS o que ainda precisa sair do caixa.
+                // Nunca pode voltar para o valor cheio depois de pagamentos parciais ou totais.
+                if (restante <= 0.01) {
+                    // Fatura quitada: remove o card do fluxo de caixa.
+                    // Os pagamentos continuam registrados no histórico da fatura.
+                    data.semanas.forEach(s => {
+                        s.itens = (s.itens || []).filter(it =>
+                            !((it._faturaAutomatica && it.cartaoNome === cartao.nome) ||
+                              it.desc === nomeItemCard)
+                        );
+                    });
+                    return;
+                }
+
                 if (!faturaExistente) {
                     faturaExistente = {
                         id: Date.now() + Math.random(),
                         desc: nomeItemCard,
-                        valor: restante > 0 ? restante : totalRealFatura,
+                        valor: restante,
                         tipo: 'saida',
-                        pago: totalPago >= totalRealFatura,
+                        pago: false,
                         _faturaAutomatica: true,
                         cartaoNome: cartao.nome,
                         faturaMes: mesAnteriorId
@@ -1354,12 +1377,12 @@
                         data.semanas[semIdxPrevista].itens.push(faturaExistente);
                     }
                 } else {
-                    // Mantém exatamente a semana atual da fatura (inclusive se a usuária
-                    // acabou de arrastá-la), apenas atualizando seus dados financeiros.
+                    // Mantém exatamente a semana para a qual a usuária arrastou a fatura.
+                    // Apenas atualiza o valor para o RESTANTE real a pagar.
                     faturaExistente.desc = nomeItemCard;
-                    faturaExistente.valor = restante > 0 ? restante : totalRealFatura;
+                    faturaExistente.valor = restante;
                     faturaExistente.tipo = 'saida';
-                    faturaExistente.pago = totalPago >= totalRealFatura || faturaExistente.pago === true;
+                    faturaExistente.pago = false;
                     faturaExistente._faturaAutomatica = true;
                     faturaExistente.cartaoNome = cartao.nome;
                     faturaExistente.faturaMes = mesAnteriorId;
@@ -1372,9 +1395,8 @@
             const data = dadosApp[mesAtual];
             if(!data) return;
 
-            sincronizarMesCompleto(mesAtual);
-            garantirFaturasNasSemanas();
-
+            // Renderização não altera os dados do Kanban.
+            // As faturas são sincronizadas apenas ao carregar/salvar dados.
             document.getElementById('lblMesCartoes').innerText = data.nomeExibicao;
 
             const grid = document.getElementById('gridCartoesDinamicos');
@@ -1459,7 +1481,7 @@
                             <span class="bg-black/20 text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap">Limite R$ ${formatarMoeda(cartao.limite)}</span>
                         </div>
                         <div class="p-4 space-y-4 flex-1">
-                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100 text-center min-w-0">
                                     <span class="text-[10px] text-indigo-700 font-bold block uppercase">Fatura com orçamento</span>
                                     <span class="text-lg font-bold text-indigo-700 whitespace-nowrap">R$ ${formatarMoeda(itensMesAtual.reduce((acc, i) => acc + (i.orcado || 0), 0))}</span>
@@ -1484,23 +1506,9 @@
                                         <i class="fa-solid fa-plus"></i> Adicionar Gasto
                                     </button>
                                 </div>
-                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] mb-3">
-                                    <div class="bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-200">
-                                        <span class="block text-slate-500">Com orçamento</span>
-                                        <strong class="text-indigo-700">R$ ${formatarMoeda(itensMesAtual.reduce((acc, i) => acc + (i.orcado || 0), 0))}</strong>
-                                    </div>
-                                    <div class="bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-200">
-                                        <span class="block text-slate-500">Sem orçamento</span>
-                                        <strong class="text-slate-800">R$ ${formatarMoeda(totalRealizado)}</strong>
-                                    </div>
-                                    <div class="bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-200">
-                                        <span class="block text-slate-500">Pago</span>
-                                        <strong class="text-emerald-700">R$ ${formatarMoeda(obterTotalPagoFatura(mesAtual, cartao.nome))}</strong>
-                                    </div>
-                                    <div class="bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-200">
-                                        <span class="block text-slate-500">Restante</span>
-                                        <strong class="text-rose-600">R$ ${formatarMoeda(Math.max(0, totalRealizado - obterTotalPagoFatura(mesAtual, cartao.nome)))}</strong>
-                                    </div>
+                                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] mb-3 px-1">
+                                    <span class="text-slate-500">Pago: <strong class="text-emerald-700">R$ ${formatarMoeda(obterTotalPagoFatura(mesAtual, cartao.nome))}</strong></span>
+                                    <span class="text-slate-500">Restante: <strong class="text-rose-600">R$ ${formatarMoeda(Math.max(0, totalRealizado - obterTotalPagoFatura(mesAtual, cartao.nome)))}</strong></span>
                                 </div>
                                 <div class="mb-3">
                                     <div class="text-[11px] font-semibold text-slate-600 mb-1">Pagamentos registrados</div>
@@ -1923,6 +1931,8 @@
                 </li>
             `).join('');
 
+            // O Kanban apenas soma os itens já existentes.
+            // Nenhuma fatura é criada, removida ou movida nesta etapa.
             let totalEntradas = 0, totalSaidas = 0;
             let saldoAcumuladoCascata = 0; 
             const gridSemanas = document.getElementById('gridSemanas'); gridSemanas.innerHTML = '';
@@ -1980,7 +1990,65 @@
             document.getElementById('resumoSaidas').innerText = `R$ ${formatarMoeda(totalSaidas)}`;
             document.getElementById('resumoSobra').innerText = `R$ ${formatarMoeda(totalEntradas - totalSaidas)}`;
         }
-    </script>
+    
+        // Máscara para datas: mostra automaticamente DD/MM/AAAA enquanto digita.
+        function aplicarMascaraData(valor) {
+            const numeros = String(valor || '').replace(/\D/g, '').slice(0, 8);
+            if (numeros.length <= 2) return numeros;
+            if (numeros.length <= 4) return numeros.slice(0, 2) + '/' + numeros.slice(2);
+            return numeros.slice(0, 2) + '/' + numeros.slice(2, 4) + '/' + numeros.slice(4);
+        }
+
+        function ativarMascarasDeData() {
+            const seletores = [
+                'input[placeholder*="DD/MM"]',
+                'input[id*="data" i]',
+                'input[name*="data" i]',
+                'input[id*="pagamento" i]',
+                'input[name*="pagamento" i]',
+                'input[id*="vencimento" i]',
+                'input[name*="vencimento" i]'
+            ];
+
+            document.querySelectorAll(seletores.join(',')).forEach(input => {
+                if (input.dataset.dateMaskAtiva === '1') return;
+
+                // Não aplicar máscara a campos hidden.
+                if (input.type === 'hidden') return;
+
+                input.type = 'text';
+                input.inputMode = 'numeric';
+                input.autocomplete = 'off';
+                input.placeholder = 'DD/MM/AAAA';
+                input.maxLength = 10;
+                input.dataset.dateMaskAtiva = '1';
+
+                input.addEventListener('input', function () {
+                    const inicio = this.selectionStart;
+                    const antes = this.value.length;
+                    this.value = aplicarMascaraData(this.value);
+                    const depois = this.value.length;
+                    const novaPosicao = Math.min(this.value.length, inicio + Math.max(0, depois - antes));
+                    requestAnimationFrame(() => this.setSelectionRange(novaPosicao, novaPosicao));
+                });
+
+                input.addEventListener('blur', function () {
+                    if (this.value && this.value.length !== 10) {
+                        // Mantém o que foi digitado para correção, sem inventar uma data.
+                        return;
+                    }
+                });
+            });
+        }
+
+        // Observa novos campos criados dinamicamente pelos modais.
+        document.addEventListener('DOMContentLoaded', () => {
+            ativarMascarasDeData();
+            const observer = new MutationObserver(() => ativarMascarasDeData());
+            observer.observe(document.body, { childList: true, subtree: true });
+        });
+
+</script>
 
     <!-- Modal de pagamento de fatura -->
     <div id="modalPagamentoFatura" class="hidden fixed inset-0 z-[80] bg-black/50 p-4 flex items-center justify-center">
