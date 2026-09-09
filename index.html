@@ -1167,7 +1167,7 @@
             });
 
             fecharModalPagamentoFatura();
-            // Ao salvar, o Kanban será atualizado apenas com o valor restante da fatura.
+            // Ao salvar, o Kanban preserva o compromisso na semana escolhida; se quitado, permanece marcado como pago.
             salvarTudo();
         }
 
@@ -1361,21 +1361,26 @@
                 const totalPago = obterTotalPagoFatura(mesAnteriorId, cartao.nome);
                 const restante = Math.max(0, totalRealFatura - totalPago);
 
-                // A fatura no Kanban representa APENAS o que ainda precisa sair do caixa.
-                // Nunca pode voltar para o valor cheio depois de pagamentos parciais ou totais.
-                if (restante <= 0.01) {
-                    // Fatura quitada: remove o card do fluxo de caixa.
-                    // Os pagamentos continuam registrados no histórico da fatura.
-                    data.semanas.forEach(s => {
-                        s.itens = (s.itens || []).filter(it =>
-                            !((it._faturaAutomatica && it.cartaoNome === cartao.nome) ||
-                              it.desc === nomeItemCard)
-                        );
-                    });
-                    return;
-                }
-
+                /*
+                 * A fatura é um compromisso de caixa do Kanban.
+                 *
+                 * Depois que a usuária escolhe a semana e registra o pagamento,
+                 * o lançamento NÃO pode desaparecer: ele precisa continuar naquela
+                 * semana para que o histórico e o saldo planejado não "saltem".
+                 *
+                 * Regra:
+                 * - enquanto ainda houver saldo pendente, o card mostra o restante;
+                 * - quando quitar, o card mantém o último valor pendente mostrado
+                 *   e apenas fica marcado como pago;
+                 * - nunca voltamos ao valor cheio da fatura;
+                 * - nunca removemos o card automaticamente por causa do pagamento.
+                 */
                 if (!faturaExistente) {
+                    // Só cria um novo card se ainda existe algo pendente.
+                    // Se a fatura já estava totalmente paga antes de existir no
+                    // Kanban, não inventamos um lançamento retroativo.
+                    if (restante <= 0.01) return;
+
                     faturaExistente = {
                         id: Date.now() + Math.random(),
                         desc: nomeItemCard,
@@ -1384,7 +1389,8 @@
                         pago: false,
                         _faturaAutomatica: true,
                         cartaoNome: cartao.nome,
-                        faturaMes: mesAnteriorId
+                        faturaMes: mesAnteriorId,
+                        _valorFaturaFixado: restante
                     };
 
                     if (data.semanas[semIdxPrevista]) {
@@ -1392,14 +1398,29 @@
                     }
                 } else {
                     // Mantém exatamente a semana para a qual a usuária arrastou a fatura.
-                    // Apenas atualiza o valor para o RESTANTE real a pagar.
                     faturaExistente.desc = nomeItemCard;
-                    faturaExistente.valor = restante;
                     faturaExistente.tipo = 'saida';
-                    faturaExistente.pago = false;
                     faturaExistente._faturaAutomatica = true;
                     faturaExistente.cartaoNome = cartao.nome;
                     faturaExistente.faturaMes = mesAnteriorId;
+
+                    if (restante > 0.01) {
+                        // Ainda há algo pendente: atualiza para o valor realmente
+                        // restante e guarda esse valor como o compromisso exibido.
+                        faturaExistente.valor = restante;
+                        faturaExistente._valorFaturaFixado = restante;
+                        faturaExistente.pago = false;
+                    } else {
+                        // Quitada: mantém o último valor exibido no Kanban.
+                        // O checkbox mostra que aquele compromisso foi pago, mas
+                        // o valor permanece para não alterar artificialmente o saldo.
+                        const valorFixado = faturaExistente._valorFaturaFixado
+                            ?? faturaExistente.valor
+                            ?? restante;
+                        faturaExistente.valor = valorFixado;
+                        faturaExistente._valorFaturaFixado = valorFixado;
+                        faturaExistente.pago = true;
+                    }
                 }
             });
         }
@@ -1960,7 +1981,7 @@
                     return `
                         <li draggable="true" ondragstart="drag(event, 'semana', ${semIdx}, ${itemIdx})" class="financeiro-tooltip py-2 px-2 bg-white rounded border shadow-sm flex items-center justify-between text-xs gap-2 cursor-grab" data-tooltip="${String(item.desc || '').replace(/"/g, '&quot;')} — R$ ${formatarMoeda(val)}" title="${String(item.desc || '').replace(/"/g, '&quot;')} — R$ ${formatarMoeda(val)}">
                             <div class="flex items-center gap-2 overflow-hidden">
-                                <input type="checkbox" ${item.pago ? 'checked' : ''} onchange="alternarPago(${semIdx}, ${itemIdx}, this)" class="rounded text-indigo-600 cursor-pointer" title="${item._faturaAutomatica ? 'Registrar pagamento da fatura' : 'Marcar como pago'}">
+                                <input type="checkbox" ${item.pago ? 'checked' : ''} onchange="alternarPago(${semIdx}, ${itemIdx}, this)" class="rounded text-indigo-600 cursor-pointer" title="${item._faturaAutomatica ? (item.pago ? 'Fatura quitada — clique para consultar/registrar pagamento' : 'Registrar pagamento da fatura') : 'Marcar como pago'}">
                                 <span class="${item.pago ? 'line-through text-slate-400' : ''} truncate font-medium">${item.desc}</span>
                             </div>
                             <div class="flex items-center gap-1.5 whitespace-nowrap">
