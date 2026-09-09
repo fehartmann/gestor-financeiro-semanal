@@ -1044,8 +1044,22 @@
             }
         }
 
-        function alternarPago(semIndex, itemIndex) {
-            dadosApp[mesAtual].semanas[semIndex].itens[itemIndex].pago = !dadosApp[mesAtual].semanas[semIndex].itens[itemIndex].pago;
+        function alternarPago(semIndex, itemIndex, checkbox) {
+            const item = dadosApp[mesAtual].semanas[semIndex].itens[itemIndex];
+            if (!item) return;
+
+            // Faturas automáticas de cartão não são "quitadas" apenas marcando
+            // uma flag. Elas podem receber pagamentos parciais e antecipados.
+            // Portanto, ao clicar no checkbox abrimos o registro de pagamento.
+            if (item._faturaAutomatica && item.cartaoNome && item.faturaMes) {
+                if (checkbox) checkbox.checked = false;
+                abrirModalPagamentoFatura(item.cartaoNome, item.faturaMes);
+                return;
+            }
+
+            // Para contas normais do Kanban, o checkbox continua funcionando
+            // como marcação simples de pago/não pago.
+            item.pago = checkbox ? checkbox.checked : !item.pago;
             salvarTudo();
         }
 
@@ -1946,7 +1960,7 @@
                     return `
                         <li draggable="true" ondragstart="drag(event, 'semana', ${semIdx}, ${itemIdx})" class="financeiro-tooltip py-2 px-2 bg-white rounded border shadow-sm flex items-center justify-between text-xs gap-2 cursor-grab" data-tooltip="${String(item.desc || '').replace(/"/g, '&quot;')} — R$ ${formatarMoeda(val)}" title="${String(item.desc || '').replace(/"/g, '&quot;')} — R$ ${formatarMoeda(val)}">
                             <div class="flex items-center gap-2 overflow-hidden">
-                                <input type="checkbox" ${item.pago ? 'checked' : ''} onchange="alternarPago(${semIdx}, ${itemIdx})" class="rounded text-indigo-600 cursor-pointer">
+                                <input type="checkbox" ${item.pago ? 'checked' : ''} onchange="alternarPago(${semIdx}, ${itemIdx}, this)" class="rounded text-indigo-600 cursor-pointer" title="${item._faturaAutomatica ? 'Registrar pagamento da fatura' : 'Marcar como pago'}">
                                 <span class="${item.pago ? 'line-through text-slate-400' : ''} truncate font-medium">${item.desc}</span>
                             </div>
                             <div class="flex items-center gap-1.5 whitespace-nowrap">
