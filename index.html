@@ -891,118 +891,46 @@
                 });
             }
 
-            // Sincroniza orçamentos e parcelas de cartão diretamente no mês correspondente.
-            // IMPORTANTE: os registros gerados a partir de "Parcelas" são vinculados
-            // pelo parcelamentoId, nunca pela descrição. Assim, editar ou excluir um
-            // cadastro atualiza/remove exatamente os lançamentos correspondentes.
-            const idsParcelamentosAtivos = new Set(parceladosApp.map(p => String(p.id)));
-
+            // Sincroniza orçamentos e parcelas de cartão diretamente no mês correspondente
             configCartoes.forEach(cartao => {
                 let chaveItens = `itens${cartao.nome}`;
                 if (!dadosApp[mesId][chaveItens]) dadosApp[mesId][chaveItens] = [];
                 let itensAtuais = dadosApp[mesId][chaveItens];
                 let nomeCartaoBusca = cartao.nome.toLowerCase().replace('cartão', '').trim();
 
-                // Remove lançamentos de parcelas cujo cadastro já foi excluído.
-                itensAtuais = itensAtuais.filter(item =>
-                    !item.parcelamentoId || idsParcelamentosAtivos.has(String(item.parcelamentoId))
-                );
-
-                // Garante/atualiza Orçamentos Admin.
+                // Garante Orçamentos Admin
                 configOrcamentos.forEach(o => {
                     let cartaoOrc = (o.cartao || '').toLowerCase().replace('cartão', '').trim();
                     if (cartaoOrc === nomeCartaoBusca) {
-                        const ativo = (!o.inicio || mesId >= o.inicio) && (!o.fim || mesId <= o.fim);
-                        const existente = itensAtuais.find(item =>
-                            !item.parcelamentoId && item.desc === o.desc
-                        );
-
-                        if (ativo && !existente) {
-                            itensAtuais.push({
-                                id: Date.now() + Math.random(),
-                                desc: o.desc,
-                                orcado: o.valor,
-                                real: o.valor
-                            });
-                        } else if (ativo && existente) {
-                            existente.orcado = o.valor;
-                            // Orçamento continua sendo o valor comprometido até que a
-                            // usuária altere o valor real do lançamento.
-                            if (existente.real === undefined || existente.real === null) {
-                                existente.real = o.valor;
+                        if ((!o.inicio || mesId >= o.inicio) && (!o.fim || mesId <= o.fim)) {
+                            if (!itensAtuais.some(item => item.desc === o.desc)) {
+                                itensAtuais.push({ id: Date.now() + Math.random(), desc: o.desc, orcado: o.valor, real: o.valor });
                             }
                         }
                     }
                 });
 
-                // Primeiro remove deste mês parcelas do cartão que não deveriam existir
-                // aqui (por destino ou período).
-                itensAtuais = itensAtuais.filter(item => {
-                    if (!item.parcelamentoId) return true;
-
-                    const p = parceladosApp.find(x => String(x.id) === String(item.parcelamentoId));
-                    if (!p) return false;
-
-                    const dest = (p.destino || '').toLowerCase().replace('cartão', '').trim();
-                    const ativoNoMes = dest === nomeCartaoBusca &&
-                        (!p.inicio || mesId >= p.inicio) &&
-                        (!p.fim || mesId <= p.fim);
-
-                    return ativoNoMes;
-                });
-
-                // Garante E ATUALIZA cada parcela. O cadastro é a fonte de verdade:
-                // mudar R$ 3.000 para R$ 500 altera imediatamente o lançamento do cartão.
+                // Garante Parcelas Admin associadas ao cartão (conforme cadastro)
                 parceladosApp.forEach(p => {
                     let dest = (p.destino || '').toLowerCase().replace('cartão', '').trim();
-                    if (dest !== nomeCartaoBusca) return;
-
-                    const ativoNoMes = (!p.inicio || mesId >= p.inicio) &&
-                                       (!p.fim || mesId <= p.fim);
-                    if (!ativoNoMes) return;
-
-                    let descParcela = `[Parcela] ${p.desc}`;
-                    let parcelaNumero = null;
-
-                    if (p.primeiraParcela && p.quantidadeParcelas) {
-                        let [ay, am] = p.primeiraParcela.split('-').map(Number);
-                        let [by, bm] = mesId.split('-').map(Number);
-                        parcelaNumero = (by * 12 + bm) - (ay * 12 + am) + 1;
-                        if (parcelaNumero < 1 || parcelaNumero > p.quantidadeParcelas) {
-                            parcelaNumero = null;
+                    if (dest === nomeCartaoBusca) {
+                        if ((!p.inicio || mesId >= p.inicio) && (!p.fim || mesId <= p.fim)) {
+                            let descParcela = `[Parcela] ${p.desc}`;
+                            let parcelaNumero = null;
+                            if (p.primeiraParcela && p.quantidadeParcelas) {
+                                let [ay, am] = p.primeiraParcela.split('-').map(Number);
+                                let [by, bm] = mesId.split('-').map(Number);
+                                parcelaNumero = (by * 12 + bm) - (ay * 12 + am) + 1;
+                                if (parcelaNumero < 1 || parcelaNumero > p.quantidadeParcelas) parcelaNumero = null;
+                            }
+                            let rotuloParcela = parcelaNumero ? ` ${parcelaNumero}/${p.quantidadeParcelas}` : '';
+                            let descFinal = `${descParcela}${rotuloParcela}`;
+                            if (!itensAtuais.some(item => item.desc === descFinal)) {
+                                itensAtuais.push({ id: Date.now() + Math.random(), desc: descFinal, orcado: p.valor, real: p.valor, parcelamentoId: p.id, parcelaNumero });
+                            }
                         }
                     }
-
-                    let rotuloParcela = parcelaNumero
-                        ? ` ${parcelaNumero}/${p.quantidadeParcelas}`
-                        : '';
-                    let descFinal = `${descParcela}${rotuloParcela}`;
-
-                    let existente = itensAtuais.find(item =>
-                        String(item.parcelamentoId) === String(p.id)
-                    );
-
-                    if (!existente) {
-                        existente = {
-                            id: Date.now() + Math.random(),
-                            desc: descFinal,
-                            orcado: p.valor,
-                            real: p.valor,
-                            parcelamentoId: p.id,
-                            parcelaNumero
-                        };
-                        itensAtuais.push(existente);
-                    } else {
-                        // Atualiza inclusive descrição, valor e número da parcela.
-                        // Isso corrige edição de valor e evita duplicação.
-                        existente.desc = descFinal;
-                        existente.orcado = p.valor;
-                        existente.real = p.valor;
-                        existente.parcelaNumero = parcelaNumero;
-                    }
                 });
-
-                dadosApp[mesId][chaveItens] = itensAtuais;
             });
         }
 
