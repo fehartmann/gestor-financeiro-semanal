@@ -910,7 +910,11 @@
                     }
                 });
 
-                // Garante Parcelas Admin associadas ao cartão (conforme cadastro)
+                // Garante Parcelas Admin associadas ao cartão (conforme cadastro).
+                // A sincronização genérica é SOMENTE aditiva: se o lançamento já existe,
+                // não mexe no valor real do cartão. Alterações de uma parcela são feitas
+                // exclusivamente na função salvarParcelado(), que remove/recria somente
+                // os lançamentos vinculados àquela parcela.
                 parceladosApp.forEach(p => {
                     let dest = (p.destino || '').toLowerCase().replace('cartão', '').trim();
                     if (dest === nomeCartaoBusca) {
@@ -925,8 +929,20 @@
                             }
                             let rotuloParcela = parcelaNumero ? ` ${parcelaNumero}/${p.quantidadeParcelas}` : '';
                             let descFinal = `${descParcela}${rotuloParcela}`;
-                            if (!itensAtuais.some(item => item.desc === descFinal)) {
-                                itensAtuais.push({ id: Date.now() + Math.random(), desc: descFinal, orcado: p.valor, real: p.valor, parcelamentoId: p.id, parcelaNumero });
+
+                            const existePorId = itensAtuais.some(item =>
+                                String(item.parcelamentoId) === String(p.id)
+                            );
+
+                            if (!existePorId && !itensAtuais.some(item => item.desc === descFinal)) {
+                                itensAtuais.push({
+                                    id: Date.now() + Math.random(),
+                                    desc: descFinal,
+                                    orcado: p.valor,
+                                    real: p.valor,
+                                    parcelamentoId: p.id,
+                                    parcelaNumero
+                                });
                             }
                         }
                     }
@@ -1825,10 +1841,11 @@
             let primeiraParcela = document.getElementById('parcPrimeira').value;
             let quantidadeParcelas = parseInt(document.getElementById('parcQtd').value, 10);
 
-            if(!desc || isNaN(valor) || valor <= 0) return alert('Preencha a descrição e o valor corretamente.');
+            if(!desc || isNaN(valor) || valor <= 0) {
+                return alert('Preencha a descrição e o valor corretamente.');
+            }
 
             if (primeiraParcela && quantidadeParcelas > 0) {
-                // Para parcelamentos, início/fim passam a ser derivados.
                 inicio = primeiraParcela;
                 let [ano, mes] = primeiraParcela.split('-').map(Number);
                 mes += quantidadeParcelas - 1;
@@ -1837,23 +1854,53 @@
                 fim = `${ano}-${String(mes).padStart(2, '0')}`;
             }
 
+            const id = idEdicao !== '' ? Number(idEdicao) : Date.now();
+
+            // Ao EDITAR, primeiro removemos apenas os lançamentos que pertencem
+            // a esta parcela. Não tocamos em nenhum outro gasto do cartão.
+            if (idEdicao !== '') {
+                Object.keys(dadosApp).forEach(mKey => {
+                    configCartoes.forEach(cartao => {
+                        const chave = `itens${cartao.nome}`;
+                        if (dadosApp[mKey][chave]) {
+                            dadosApp[mKey][chave] = dadosApp[mKey][chave].filter(item =>
+                                String(item.parcelamentoId) !== String(id)
+                            );
+                        }
+                    });
+                });
+            }
+
             const dadosParcela = {
-                id: idEdicao !== '' ? Number(idEdicao) : Date.now(),
-                desc, valor, destino, inicio, fim,
+                id,
+                desc,
+                valor,
+                destino,
+                inicio,
+                fim,
                 primeiraParcela: primeiraParcela || inicio || '',
                 quantidadeParcelas: quantidadeParcelas > 0 ? quantidadeParcelas : null
             };
 
             if(idEdicao !== '') {
-                let p = parceladosApp.find(x => x.id == idEdicao);
-                if(p) Object.assign(p, dadosParcela);
+                const indice = parceladosApp.findIndex(x => String(x.id) === String(id));
+                if (indice >= 0) {
+                    parceladosApp[indice] = dadosParcela;
+                } else {
+                    parceladosApp.push(dadosParcela);
+                }
             } else {
                 parceladosApp.push(dadosParcela);
             }
+
             fecharModalParcelado();
+
+            // Recria somente os lançamentos desta parcela nos meses em que ela
+            // efetivamente existe. O valor do cartão não é recalculado de forma
+            // global nem os demais lançamentos são alterados.
+            Object.keys(dadosApp).forEach(mKey => sincronizarMesCompleto(mKey));
             salvarTudo();
         }
-
 
         function renderizarParcelados() {
             const tbody = document.getElementById('tabelaParcelados'); tbody.innerHTML = '';
@@ -1881,10 +1928,25 @@
         }
 
         function excluirParcela(id) {
-            if(confirm('Tem certeza que deseja excluir esta parcela/assinatura?')) {
-                parceladosApp = parceladosApp.filter(x => x.id !== id);
-                salvarTudo();
-            }
+            if(!confirm('Tem certeza que deseja excluir esta parcela/assinatura?')) return;
+
+            // Remove o cadastro.
+            parceladosApp = parceladosApp.filter(x => String(x.id) !== String(id));
+
+            // Remove somente os lançamentos de cartão/parcelas gerados por este cadastro.
+            // Gastos manuais permanecem intactos.
+            Object.keys(dadosApp).forEach(mKey => {
+                configCartoes.forEach(cartao => {
+                    const chave = `itens${cartao.nome}`;
+                    if (dadosApp[mKey][chave]) {
+                        dadosApp[mKey][chave] = dadosApp[mKey][chave].filter(item =>
+                            String(item.parcelamentoId) !== String(id)
+                        );
+                    }
+                });
+            });
+
+            salvarTudo();
         }
 
         function renderizarReservas() {
