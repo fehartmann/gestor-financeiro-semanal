@@ -51,6 +51,13 @@
         }
 
 
+        #gridCartoesDinamicos {
+            align-items: stretch;
+        }
+        #gridCartoesDinamicos > .cartao-card {
+            height: 100%;
+        }
+
         @media (max-width: 640px) {
             * { box-sizing: border-box; }
             html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
@@ -154,6 +161,12 @@
             #gridCartoesDinamicos > div {
                 width: 100%;
                 min-width: 0;
+            }
+            #gridCartoesDinamicos > .cartao-card {
+                height: auto;
+            }
+            #gridCartoesDinamicos .cartao-card .min-h-\[72px\] {
+                min-height: 0;
             }
             #gridCartoesDinamicos .overflow-x-auto {
                 max-width: 100%;
@@ -1526,12 +1539,12 @@
                 `).join('');
 
                 grid.innerHTML += `
-                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-w-0">
+                    <div class="cartao-card bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-w-0 h-full">
                         <div class="${corBg} text-white p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                             <div class="min-w-0"><h3 class="font-bold text-base truncate">${cartao.nome}</h3><p class="text-xs opacity-90">Gastos em ${data.nomeExibicao} (Fatura vence no próximo mês)</p></div>
                             <span class="bg-black/20 text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap">Limite R$ ${formatarMoeda(cartao.limite)}</span>
                         </div>
-                        <div class="p-4 space-y-4 flex-1">
+                        <div class="p-4 space-y-4 flex-1 flex flex-col">
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100 text-center min-w-0">
                                     <span class="text-[10px] text-indigo-700 font-bold block uppercase">Fatura com orçamento</span>
@@ -1561,7 +1574,7 @@
                                     <span class="text-slate-500">Pago: <strong class="text-emerald-700">R$ ${formatarMoeda(obterTotalPagoFatura(mesAtual, cartao.nome))}</strong></span>
                                     <span class="text-slate-500">Restante: <strong class="text-rose-600">R$ ${formatarMoeda(Math.max(0, totalRealizado - obterTotalPagoFatura(mesAtual, cartao.nome)))}</strong></span>
                                 </div>
-                                <div class="mb-3">
+                                <div class="mb-3 min-h-[72px]">
                                     <div class="text-[11px] font-semibold text-slate-600 mb-1">Pagamentos registrados</div>
                                     <div class="space-y-1">
                                         ${obterPagamentosFatura(mesAtual, cartao.nome).length
@@ -1581,7 +1594,7 @@
                                     </div>
                                 </div>
                                 <button onclick="abrirModalPagamentoFatura('${cartao.nome}', '${mesAtual}')"
-                                    class="mb-3 w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-semibold">
+                                    class="mb-3 w-full sm:w-auto min-h-[40px] bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-semibold inline-flex items-center justify-center gap-1">
                                     <i class="fa-solid fa-money-bill-wave"></i> ${obterTotalPagoFatura(mesAtual, cartao.nome) >= faturaPrevista && faturaPrevista > 0 ? 'Registrar novo pagamento' : 'Registrar pagamento'}
                                 </button>
                                 <div class="overflow-x-auto border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
@@ -2101,8 +2114,6 @@
                 'input[placeholder*="DD/MM"]',
                 'input[id*="data" i]',
                 'input[name*="data" i]',
-                'input[id*="pagamento" i]',
-                'input[name*="pagamento" i]',
                 'input[id*="vencimento" i]',
                 'input[name*="vencimento" i]'
             ];
@@ -2165,7 +2176,7 @@
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-slate-600 block mb-1">Data do pagamento (DD/MM/AAAA)</label>
-                    <input id="pagamentoData" type="text" inputmode="numeric" maxlength="10" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm" placeholder="DD/MM/AAAA">
+                    <input id="pagamentoData" type="text" inputmode="numeric" maxlength="10" autocomplete="off" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm" placeholder="DD/MM/AAAA">
                     <p class="text-[10px] text-slate-500 mt-1">Deixe em branco se quiser definir a semana diretamente no Kanban.</p>
                 </div>
             </div>
