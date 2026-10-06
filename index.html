@@ -9,6 +9,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
         .kanban-drop-zone { min-height: 150px; transition: background-color 0.2s; }
@@ -247,10 +249,20 @@
                 grid-column: span 2;
             }
 
+            nav > div {
+                width: 100%;
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                overflow: visible;
+            }
             nav .tab-btn {
-                min-width: 118px;
-                flex: 0 0 auto;
+                min-width: 0;
+                width: 100%;
+                flex: none;
                 white-space: nowrap;
+                padding-left: 6px;
+                padding-right: 6px;
+                font-size: 11px;
             }
 
             main {
@@ -448,15 +460,27 @@
                     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
                         <div>
                             <h2 class="text-lg font-bold text-slate-800">Relatório financeiro</h2>
-                            <p class="text-xs text-slate-500 mt-1">Selecione um ou vários meses para comparar entradas, saídas e os compromissos dos cartões.</p>
+                            <p class="text-xs text-slate-500 mt-1">Escolha o ano e depois os meses que deseja analisar. O relatório reúne o fluxo financeiro e os compromissos dos cartões.</p>
                         </div>
                         <div class="flex flex-wrap gap-2">
                             <button type="button" onclick="selecionarMesesRelatorio('todos')" class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">Selecionar todos</button>
                             <button type="button" onclick="selecionarMesesRelatorio('limpar')" class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">Limpar</button>
                             <button type="button" onclick="atualizarRelatorio()" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"><i class="fa-solid fa-rotate"></i> Atualizar</button>
+                            <button type="button" onclick="baixarRelatorioPDF()" class="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold"><i class="fa-solid fa-file-pdf"></i> Baixar PDF</button>
                         </div>
                     </div>
-                    <div id="seletorMesesRelatorio" class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2"></div>
+
+                    <div class="mt-4 max-w-xs">
+                        <label for="anoRelatorio" class="text-xs font-semibold text-slate-600 block mb-1">Ano</label>
+                        <select id="anoRelatorio" onchange="renderizarSeletorMesesRelatorio(true)" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white"></select>
+                    </div>
+                    <div class="mt-4">
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <span class="text-xs font-semibold text-slate-600">Meses</span>
+                            <span id="contadorMesesRelatorio" class="text-[11px] text-slate-400"></span>
+                        </div>
+                        <div id="seletorMesesRelatorio" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2"></div>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
@@ -477,13 +501,11 @@
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div class="p-4 border-b border-slate-200">
                         <h3 class="font-bold text-sm text-slate-800">Resumo por mês</h3>
-                        <p class="text-[11px] text-slate-500 mt-1">Saídas aqui são as movimentações do Kanban, incluindo as faturas registradas como saída.</p>
+                        <p class="text-[11px] text-slate-500 mt-1">Aqui entram todas as movimentações do Kanban. As compras de cartão ficam em uma seção separada para não contar a fatura duas vezes.</p>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[620px] text-left text-xs">
-                            <thead class="bg-slate-100 text-slate-600 uppercase">
-                                <tr><th class="p-3">Mês</th><th class="p-3">Entradas</th><th class="p-3">Saídas</th><th class="p-3">Saldo</th></tr>
-                            </thead>
+                            <thead class="bg-slate-100 text-slate-600 uppercase"><tr><th class="p-3">Mês</th><th class="p-3">Entradas</th><th class="p-3">Saídas</th><th class="p-3">Saldo</th></tr></thead>
                             <tbody id="tabelaResumoRelatorio" class="divide-y divide-slate-100"></tbody>
                         </table>
                     </div>
@@ -491,13 +513,25 @@
 
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div class="p-4 border-b border-slate-200">
+                        <h3 class="font-bold text-sm text-slate-800">Lançamentos do período</h3>
+                        <p class="text-[11px] text-slate-500 mt-1">Entradas e saídas do Kanban, com parcela quando o lançamento estiver vinculado a um parcelamento.</p>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[760px] text-left text-xs">
+                            <thead class="bg-slate-100 text-slate-600 uppercase"><tr><th class="p-3">Mês</th><th class="p-3">Tipo</th><th class="p-3">Descrição</th><th class="p-3">Parcela</th><th class="p-3">Valor</th><th class="p-3">Status</th></tr></thead>
+                            <tbody id="tabelaLancamentosRelatorio" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-4 border-b border-slate-200">
                         <h3 class="font-bold text-sm text-slate-800">Gastos dos cartões</h3>
-                        <p class="text-[11px] text-slate-500 mt-1">Compromissos lançados nos cartões no mês selecionado. Parcelas mostram a posição, por exemplo <strong>1/5</strong>. Estes valores ficam separados das saídas do Kanban para não contar a mesma fatura duas vezes.</p>
+                        <p class="text-[11px] text-slate-500 mt-1">Mostra os compromissos feitos nos cartões, incluindo a posição da parcela (ex.: <strong>1/5</strong>) e o valor real registrado.</p>
                     </div>
                     <div id="conteudoRelatorioCartoes" class="divide-y divide-slate-100"></div>
                 </div>
             </section>
-
             <section id="aba-parcelados" class="hidden space-y-6">
                 <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
                     <div class="flex justify-between items-center">
@@ -2095,29 +2129,54 @@
             if(!nome || isNaN(limite) || limite <= 0) return; configCartoes.push({id:Date.now(), nome, limite, semanaTeto, cor}); fecharModalAdminCartao(); salvarTudo();
         }
 
+        function obterAnosRelatorio() {
+            return [...new Set(Object.keys(dadosApp).map(k => String(k).slice(0,4)).filter(Boolean))].sort();
+        }
+
         function obterMesesOrdenadosRelatorio() {
-            return Object.keys(dadosApp).sort((a, b) => a.localeCompare(b));
+            const ano = document.getElementById('anoRelatorio')?.value;
+            return Object.keys(dadosApp).filter(k => !ano || String(k).startsWith(String(ano) + '-')).sort((a, b) => a.localeCompare(b));
         }
 
         function obterMesesSelecionadosRelatorio() {
             return Array.from(document.querySelectorAll('#seletorMesesRelatorio input[data-mes-relatorio]:checked')).map(el => el.value);
         }
 
-        function renderizarSeletorMesesRelatorio() {
+        function renderizarSeletorMesesRelatorio(preservarSelecao = false) {
+            const anoSelect = document.getElementById('anoRelatorio');
             const container = document.getElementById('seletorMesesRelatorio');
-            if (!container) return;
-            const meses = obterMesesOrdenadosRelatorio();
-            const selecionadosAntes = new Set(obterMesesSelecionadosRelatorio());
-            const selecionados = selecionadosAntes.size ? selecionadosAntes : new Set([mesAtual]);
+            if (!anoSelect || !container) return;
 
+            const anos = obterAnosRelatorio();
+            const anoAnterior = anoSelect.value;
+            const mesesAntes = preservarSelecao ? new Set(obterMesesSelecionadosRelatorio()) : new Set();
+            const anoAtual = String(mesAtual || '').slice(0,4);
+            anoSelect.innerHTML = anos.map(ano => `<option value="${ano}">${ano}</option>`).join('');
+            if (anos.includes(anoAnterior)) anoSelect.value = anoAnterior;
+            else if (anos.includes(anoAtual)) anoSelect.value = anoAtual;
+            else if (anos.length) anoSelect.value = anos[anos.length - 1];
+
+            const meses = obterMesesOrdenadosRelatorio();
+            const mesesSelecionados = mesesAntes.size
+                ? new Set(meses.filter(m => mesesAntes.has(m)))
+                : new Set([mesAtual].filter(m => meses.includes(m)));
+
+            const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
             container.innerHTML = meses.map(mes => {
-                const nome = dadosApp[mes]?.nomeExibicao || mes;
-                const checked = selecionados.has(mes) ? 'checked' : '';
+                const [,mm] = mes.split('-');
+                const nome = nomes[(Number(mm) || 1) - 1] || (dadosApp[mes]?.nomeExibicao || mes);
+                const checked = mesesSelecionados.has(mes) ? 'checked' : '';
                 return `<label class="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-indigo-50 cursor-pointer text-xs min-w-0">
                     <input type="checkbox" data-mes-relatorio value="${mes}" ${checked} onchange="atualizarRelatorio()" class="rounded text-indigo-600 shrink-0">
                     <span class="font-semibold text-slate-700 truncate">${nome}</span>
                 </label>`;
             }).join('');
+            atualizarContadorMesesRelatorio();
+        }
+
+        function atualizarContadorMesesRelatorio() {
+            const el = document.getElementById('contadorMesesRelatorio');
+            if (el) el.innerText = `${obterMesesSelecionadosRelatorio().length} mês(es) selecionado(s)`;
         }
 
         function selecionarMesesRelatorio(modo) {
@@ -2127,42 +2186,88 @@
             atualizarRelatorio();
         }
 
+        function obterNumeroParcelaRelatorio(item, mesId) {
+            if (!item) return '';
+            if (item.parcelaNumero && item.quantidadeParcelas) return `${item.parcelaNumero}/${item.quantidadeParcelas}`;
+            if (item.parcelamentoId) {
+                const p = parceladosApp.find(x => String(x.id) === String(item.parcelamentoId));
+                if (p?.primeiraParcela && p?.quantidadeParcelas) {
+                    const [ay, am] = p.primeiraParcela.split('-').map(Number);
+                    const [by, bm] = mesId.split('-').map(Number);
+                    const numero = (by * 12 + bm) - (ay * 12 + am) + 1;
+                    if (numero >= 1 && numero <= Number(p.quantidadeParcelas)) return `${numero}/${p.quantidadeParcelas}`;
+                }
+            }
+            const match = String(item.desc || '').match(/\b(\d+)\s*\/\s*(\d+)\b/);
+            return match ? `${match[1]}/${match[2]}` : '';
+        }
+
         function obterFluxoMesParaRelatorio(mesId) {
             const data = dadosApp[mesId];
             let entradas = 0, saidas = 0;
             if (!data) return { entradas, saidas, saldo: 0 };
-            (data.semanas || []).forEach(sem => {
-                (sem.itens || []).forEach(item => {
-                    const valor = Number(item.valor) || 0;
-                    if (item.tipo === 'entra' || item.tipo === 'resgate') entradas += valor;
-                    else if (item.tipo === 'saida' || item.tipo === 'aplicacao') saidas += valor;
-                });
+            (data.gaveta || []).forEach(item => {
+                const valor = Number(item.valor) || 0;
+                if (item.tipo === 'entra' || item.tipo === 'resgate') entradas += valor;
+                else if (item.tipo === 'saida' || item.tipo === 'aplicacao') saidas += valor;
             });
+            (data.semanas || []).forEach(sem => (sem.itens || []).forEach(item => {
+                const valor = Number(item.valor) || 0;
+                if (item.tipo === 'entra' || item.tipo === 'resgate') entradas += valor;
+                else if (item.tipo === 'saida' || item.tipo === 'aplicacao') saidas += valor;
+            }));
             return { entradas, saidas, saldo: entradas - saidas };
         }
 
-        function obterNumeroParcelaRelatorio(item, mesId) {
-            if (!item || !item.parcelamentoId) return '';
-            const p = parceladosApp.find(x => String(x.id) === String(item.parcelamentoId));
-            if (!p || !p.primeiraParcela || !p.quantidadeParcelas) return '';
-            const [ay, am] = p.primeiraParcela.split('-').map(Number);
-            const [by, bm] = mesId.split('-').map(Number);
-            const numero = (by * 12 + bm) - (ay * 12 + am) + 1;
-            if (numero < 1 || numero > Number(p.quantidadeParcelas)) return '';
-            return `${numero}/${p.quantidadeParcelas}`;
+        function obterLancamentosRelatorio(meses) {
+            const rows = [];
+            meses.forEach(mes => {
+                const data = dadosApp[mes];
+                const nomeMes = data?.nomeExibicao || mes;
+                (data?.gaveta || []).forEach(item => rows.push({
+                    mes, nomeMes, tipo: item.tipo === 'entra' || item.tipo === 'resgate' ? 'Entrada' : 'Saída',
+                    desc: item.desc || '', parcela: obterNumeroParcelaRelatorio(item, mes), valor: Number(item.valor)||0,
+                    status: item.pago ? 'Pago' : 'Em aberto'
+                }));
+                (data?.semanas || []).forEach(sem => (sem.itens || []).forEach(item => rows.push({
+                    mes, nomeMes, tipo: item.tipo === 'entra' || item.tipo === 'resgate' ? 'Entrada' : 'Saída',
+                    desc: item.desc || '', parcela: obterNumeroParcelaRelatorio(item, mes), valor: Number(item.valor)||0,
+                    status: item.pago ? 'Pago' : 'Em aberto'
+                })));
+            });
+            return rows;
+        }
+
+        function obterItensCartoesRelatorio(meses) {
+            const rows = [];
+            meses.forEach(mes => {
+                const data = dadosApp[mes];
+                configCartoes.forEach(cartao => {
+                    const itens = data?.[`itens${cartao.nome}`] || [];
+                    itens.forEach(item => rows.push({
+                        mes, nomeMes: data?.nomeExibicao || mes, cartao: cartao.nome,
+                        desc: item.desc || '', parcela: obterNumeroParcelaRelatorio(item, mes),
+                        orcado: Number(item.orcado)||0, real: Number(item.real)||0
+                    }));
+                });
+            });
+            return rows;
         }
 
         function atualizarRelatorio() {
             const meses = obterMesesSelecionadosRelatorio();
+            atualizarContadorMesesRelatorio();
             const tabela = document.getElementById('tabelaResumoRelatorio');
+            const tabelaLanc = document.getElementById('tabelaLancamentosRelatorio');
             const cartoes = document.getElementById('conteudoRelatorioCartoes');
-            if (!tabela || !cartoes) return;
+            if (!tabela || !tabelaLanc || !cartoes) return;
 
             if (!meses.length) {
                 document.getElementById('relatorioTotalEntradas').innerText = 'R$ 0,00';
                 document.getElementById('relatorioTotalSaidas').innerText = 'R$ 0,00';
                 document.getElementById('relatorioSaldo').innerText = 'R$ 0,00';
                 tabela.innerHTML = `<tr><td colspan="4" class="p-5 text-center text-slate-400">Selecione pelo menos um mês.</td></tr>`;
+                tabelaLanc.innerHTML = `<tr><td colspan="6" class="p-5 text-center text-slate-400">Nenhum mês selecionado.</td></tr>`;
                 cartoes.innerHTML = `<div class="p-5 text-center text-slate-400 text-xs">Nenhum mês selecionado.</div>`;
                 return;
             }
@@ -2170,60 +2275,54 @@
             let totalEntradas = 0, totalSaidas = 0;
             tabela.innerHTML = meses.map(mes => {
                 const fluxo = obterFluxoMesParaRelatorio(mes);
-                totalEntradas += fluxo.entradas;
-                totalSaidas += fluxo.saidas;
-                return `<tr class="hover:bg-slate-50">
-                    <td class="p-3 font-semibold text-slate-800">${dadosApp[mes]?.nomeExibicao || mes}</td>
-                    <td class="p-3 font-semibold text-emerald-700">R$ ${formatarMoeda(fluxo.entradas)}</td>
-                    <td class="p-3 font-semibold text-rose-600">R$ ${formatarMoeda(fluxo.saidas)}</td>
-                    <td class="p-3 font-bold ${fluxo.saldo >= 0 ? 'text-indigo-700' : 'text-rose-600'}">R$ ${formatarMoeda(fluxo.saldo)}</td>
-                </tr>`;
+                totalEntradas += fluxo.entradas; totalSaidas += fluxo.saidas;
+                return `<tr class="hover:bg-slate-50"><td class="p-3 font-semibold text-slate-800">${dadosApp[mes]?.nomeExibicao || mes}</td><td class="p-3 font-semibold text-emerald-700">R$ ${formatarMoeda(fluxo.entradas)}</td><td class="p-3 font-semibold text-rose-600">R$ ${formatarMoeda(fluxo.saidas)}</td><td class="p-3 font-bold ${fluxo.saldo >= 0 ? 'text-indigo-700' : 'text-rose-600'}">R$ ${formatarMoeda(fluxo.saldo)}</td></tr>`;
             }).join('');
-
             document.getElementById('relatorioTotalEntradas').innerText = `R$ ${formatarMoeda(totalEntradas)}`;
             document.getElementById('relatorioTotalSaidas').innerText = `R$ ${formatarMoeda(totalSaidas)}`;
-            document.getElementById('relatorioSaldo').innerText = `R$ ${formatarMoeda(totalEntradas - totalSaidas)}`;
+            document.getElementById('relatorioSaldo').innerText = `R$ ${formatarMoeda(totalEntradas-totalSaidas)}`;
 
-            cartoes.innerHTML = meses.map(mes => {
-                const data = dadosApp[mes];
-                const cardsComItens = configCartoes.map(cartao => {
-                    const itens = data?.[`itens${cartao.nome}`] || [];
-                    return { cartao, itens };
-                }).filter(x => x.itens.length);
+            const lancamentos = obterLancamentosRelatorio(meses);
+            tabelaLanc.innerHTML = lancamentos.length ? lancamentos.map(r => `<tr class="hover:bg-slate-50"><td class="p-3">${r.nomeMes}</td><td class="p-3 font-semibold ${r.tipo==='Entrada'?'text-emerald-700':'text-rose-600'}">${r.tipo}</td><td class="p-3 font-medium text-slate-700">${r.desc}</td><td class="p-3 font-semibold text-indigo-700">${r.parcela || '—'}</td><td class="p-3 font-semibold">R$ ${formatarMoeda(r.valor)}</td><td class="p-3 text-slate-500">${r.status}</td></tr>`).join('') : `<tr><td colspan="6" class="p-5 text-center text-slate-400">Nenhum lançamento no período.</td></tr>`;
 
-                if (!cardsComItens.length) {
-                    return `<div class="p-4"><h4 class="font-bold text-sm text-slate-800">${data?.nomeExibicao || mes}</h4><p class="text-xs text-slate-400 mt-1">Nenhum lançamento em cartão neste mês.</p></div>`;
-                }
-
-                return `<div class="p-4 space-y-4">
-                    <h4 class="font-bold text-sm text-slate-800">${data?.nomeExibicao || mes}</h4>
-                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        ${cardsComItens.map(({cartao, itens}) => {
-                            const total = itens.reduce((s, i) => s + (Number(i.real) || 0), 0);
-                            const cor = cartao.cor === 'rose' ? 'border-rose-200' : 'border-indigo-200';
-                            return `<div class="border ${cor} rounded-xl overflow-hidden">
-                                <div class="p-3 bg-slate-50 flex items-center justify-between gap-3">
-                                    <strong class="text-sm text-slate-800">Cartão ${cartao.nome}</strong>
-                                    <span class="text-xs font-bold text-slate-700">R$ ${formatarMoeda(total)}</span>
-                                </div>
-                                <div class="overflow-x-auto">
-                                    <table class="w-full min-w-[560px] text-xs text-left">
-                                        <thead class="bg-slate-100 text-slate-500 uppercase"><tr><th class="p-2">Descrição</th><th class="p-2">Parcela</th><th class="p-2">Orçado</th><th class="p-2">Real</th></tr></thead>
-                                        <tbody class="divide-y divide-slate-100">
-                                            ${itens.map(item => `<tr class="hover:bg-slate-50">
-                                                <td class="p-2 font-medium text-slate-700">${item.desc || ''}</td>
-                                                <td class="p-2 font-semibold text-indigo-700">${obterNumeroParcelaRelatorio(item, mes) || (String(item.desc || '').match(/\b(\d+\/\d+)\b/) || [,''])[1]}</td>
-                                                <td class="p-2 text-slate-500">R$ ${formatarMoeda(item.orcado || 0)}</td>
-                                                <td class="p-2 font-semibold text-slate-800">R$ ${formatarMoeda(item.real || 0)}</td>
-                                            </tr>`).join('')}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>`;
-                        }).join('')}
-                    </div>
-                </div>`;
+            const cartaoRows = obterItensCartoesRelatorio(meses);
+            const porMes = meses.map(mes => {
+                const rowsMes = cartaoRows.filter(r => r.mes === mes);
+                if (!rowsMes.length) return `<div class="p-4"><h4 class="font-bold text-sm text-slate-800">${dadosApp[mes]?.nomeExibicao || mes}</h4><p class="text-xs text-slate-400 mt-1">Nenhum lançamento em cartão neste mês.</p></div>`;
+                const porCartao = configCartoes.map(c => rowsMes.filter(r => r.cartao === c.nome)).filter(a => a.length);
+                return `<div class="p-4 space-y-4"><h4 class="font-bold text-sm text-slate-800">${dadosApp[mes]?.nomeExibicao || mes}</h4>${porCartao.map(rows => { const c=rows[0].cartao; const totalReal=rows.reduce((s,r)=>s+r.real,0); return `<div class="border border-slate-200 rounded-xl overflow-hidden"><div class="p-3 bg-slate-50 flex items-center justify-between gap-3"><strong class="text-sm">Cartão ${c}</strong><span class="text-xs font-bold">Real: R$ ${formatarMoeda(totalReal)}</span></div><div class="overflow-x-auto"><table class="w-full min-w-[720px] text-xs text-left"><thead class="bg-slate-100 text-slate-500 uppercase"><tr><th class="p-2">Descrição</th><th class="p-2">Parcela</th><th class="p-2">Orçado</th><th class="p-2">Real</th></tr></thead><tbody class="divide-y divide-slate-100">${rows.map(r=>`<tr><td class="p-2 font-medium">${r.desc}</td><td class="p-2 font-semibold text-indigo-700">${r.parcela||'—'}</td><td class="p-2 text-slate-500">R$ ${formatarMoeda(r.orcado)}</td><td class="p-2 font-semibold">R$ ${formatarMoeda(r.real)}</td></tr>`).join('')}</tbody></table></div></div>`; }).join('')}</div>`;
             }).join('');
+            cartoes.innerHTML = porMes;
+        }
+
+        function baixarRelatorioPDF() {
+            const meses = obterMesesSelecionadosRelatorio();
+            if (!meses.length) return alert('Selecione pelo menos um mês para gerar o PDF.');
+            if (!window.jspdf || !window.jspdf.jsPDF) return alert('A biblioteca de PDF ainda não carregou. Atualize a página e tente novamente.');
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const lancamentos = obterLancamentosRelatorio(meses);
+            const cartaoRows = obterItensCartoesRelatorio(meses);
+            const totalEntradas = meses.reduce((s,m)=>s+obterFluxoMesParaRelatorio(m).entradas,0);
+            const totalSaidas = meses.reduce((s,m)=>s+obterFluxoMesParaRelatorio(m).saidas,0);
+
+            doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.text('Relatório Financeiro', 14, 16);
+            doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.text(`Período: ${meses.map(m=>dadosApp[m]?.nomeExibicao||m).join(', ')}`,14,22);
+            doc.setFontSize(10); doc.text(`Entradas: R$ ${formatarMoeda(totalEntradas)}    Saídas: R$ ${formatarMoeda(totalSaidas)}    Saldo: R$ ${formatarMoeda(totalEntradas-totalSaidas)}`,14,29);
+
+            const resumoBody=meses.map(m=>{const f=obterFluxoMesParaRelatorio(m);return [dadosApp[m]?.nomeExibicao||m,`R$ ${formatarMoeda(f.entradas)}`,`R$ ${formatarMoeda(f.saidas)}`,`R$ ${formatarMoeda(f.saldo)}`]});
+            doc.autoTable({startY:34,head:[['Mês','Entradas','Saídas','Saldo']],body:resumoBody,theme:'grid',styles:{fontSize:8}});
+            let y=doc.lastAutoTable.finalY+8;
+            doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.text('Lançamentos do período',14,y); y+=4;
+            doc.autoTable({startY:y,head:[['Mês','Tipo','Descrição','Parcela','Valor','Status']],body:lancamentos.map(r=>[r.nomeMes,r.tipo,r.desc,r.parcela||'—',`R$ ${formatarMoeda(r.valor)}`,r.status]),theme:'striped',styles:{fontSize:7},columnStyles:{2:{cellWidth:75}}});
+            y=doc.lastAutoTable.finalY+8;
+            if(y>185){doc.addPage();y=15;}
+            doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.text('Gastos dos cartões',14,y); y+=4;
+            doc.autoTable({startY:y,head:[['Mês','Cartão','Descrição','Parcela','Orçado','Real']],body:cartaoRows.map(r=>[r.nomeMes,r.cartao,r.desc,r.parcela||'—',`R$ ${formatarMoeda(r.orcado)}`,`R$ ${formatarMoeda(r.real)}`]),theme:'striped',styles:{fontSize:7},columnStyles:{2:{cellWidth:75}}});
+            const pages=doc.internal.getNumberOfPages();
+            for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFontSize(7);doc.setFont('helvetica','normal');doc.text(`Página ${p} de ${pages}`,277,202,{align:'right'});}
+            const ano=document.getElementById('anoRelatorio')?.value||'periodo';
+            doc.save(`relatorio-financeiro-${ano}.pdf`);
         }
 
         function renderizarApp() {
