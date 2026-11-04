@@ -1459,138 +1459,126 @@
 
         function garantirFaturasNasSemanas(mesId = mesAtual) {
             const data = dadosApp[mesId];
-            if (!data) return;
+            if (!data || !Array.isArray(data.semanas)) return;
 
             const mesAnteriorId = obterMesAnterior(mesId);
             const dadosMesAnterior = dadosApp[mesAnteriorId];
 
             configCartoes.forEach(cartao => {
                 const chaveItens = `itens${cartao.nome}`;
-                const itensFatura = dadosMesAnterior && dadosMesAnterior[chaveItens]
+                const itensFatura = dadosMesAnterior && Array.isArray(dadosMesAnterior[chaveItens])
                     ? dadosMesAnterior[chaveItens]
                     : [];
+                const totalFatura = itensFatura.reduce((total, item) => total + (Number(item.real) || 0), 0);
+                const nomeFatura = `Cartão ${cartao.nome} (Fatura)`;
 
-                const totalRealFatura = itensFatura.reduce((acc, i) => acc + (i.real || 0), 0);
-                const nomeItemCard = `Cartão ${cartao.nome} (Fatura)`;
+                // Remove somente os cards auxiliares gerados anteriormente.
+                // Os registros reais de pagamento permanecem intactos em dadosApp.
+                data.semanas.forEach(semana => {
+                    semana.itens = (semana.itens || []).filter(item =>
+                        !(item._pagamentoFaturaGerado && item.cartaoNome === cartao.nome && item.faturaMes === mesAnteriorId)
+                    );
+                });
 
-                /*
-                 * A fatura é um item móvel do Kanban.
-                 * Não podemos apagá-la e recriá-la a cada salvar(), porque isso
-                 * desfaz qualquer arraste feito pela usuária.
-                 *
-                 * Estratégia:
-                 * 1. procura a fatura existente em qualquer semana;
-                 * 2. se houver mais de uma, mantém apenas uma;
-                 * 3. preserva a semana onde ela foi colocada manualmente;
-                 * 4. se não existir, cria na semana prevista do cartão.
-                 */
-                let faturaExistente = null;
-                let semanaFaturaExistente = -1;
-                let indiceFaturaExistente = -1;
-
-                data.semanas.forEach((sem, semIdx) => {
-                    const itens = sem.itens || [];
-                    for (let idx = 0; idx < itens.length; idx++) {
-                        const it = itens[idx];
-                        const ehFatura =
-                            (it._faturaAutomatica && it.cartaoNome === cartao.nome) ||
-                            it.desc === nomeItemCard ||
-                            it.desc === `Cartão ${cartao.nome} (Fatura)`;
-
-                        if (ehFatura) {
-                            if (!faturaExistente) {
-                                faturaExistente = it;
-                                semanaFaturaExistente = semIdx;
-                                indiceFaturaExistente = idx;
-                            } else {
-                                // Remove duplicatas, preservando a primeira encontrada.
-                                itens.splice(idx, 1);
-                                idx--;
-                            }
+                // Localiza a fatura agregada já existente, sem alterar sua semana manual.
+                let faturaCard = null;
+                data.semanas.forEach(semana => {
+                    const itens = semana.itens || [];
+                    for (let i = 0; i < itens.length; i++) {
+                        const item = itens[i];
+                        const corresponde =
+                            (item._faturaAutomatica && item.cartaoNome === cartao.nome) ||
+                            item.desc === nomeFatura;
+                        if (!corresponde) continue;
+                        if (!faturaCard) {
+                            faturaCard = item;
+                        } else {
+                            itens.splice(i, 1);
+                            i--;
                         }
                     }
                 });
 
-                const semIdxPrevista = Math.min(cartao.semanaTeto, data.semanas.length - 1);
-
-                if (totalRealFatura <= 0) {
-                    // Sem fatura, remove qualquer item automático/antigo que tenha sobrado.
-                    data.semanas.forEach(s => {
-                        s.itens = (s.itens || []).filter(it =>
-                            !((it._faturaAutomatica && it.cartaoNome === cartao.nome) ||
-                              it.desc === nomeItemCard)
+                if (totalFatura <= 0.01) {
+                    data.semanas.forEach(semana => {
+                        semana.itens = (semana.itens || []).filter(item =>
+                            !((item._faturaAutomatica && item.cartaoNome === cartao.nome) || item.desc === nomeFatura)
                         );
                     });
                     return;
                 }
 
-                const totalPago = obterTotalPagoFatura(mesAnteriorId, cartao.nome);
-                const restante = Math.max(0, totalRealFatura - totalPago);
+                const pagamentos = obterPagamentosFatura(mesAnteriorId, cartao.nome);
+                const totalPago = pagamentos.reduce((total, pagamento) => total + (Number(pagamento.valor) || 0), 0);
+                const restante = Math.max(0, totalFatura - totalPago);
 
-                /*
-                 * A fatura é um compromisso de caixa do Kanban.
-                 *
-                 * Depois que a usuária escolhe a semana e registra o pagamento,
-                 * o lançamento NÃO pode desaparecer: ele precisa continuar naquela
-                 * semana para que o histórico e o saldo planejado não "saltem".
-                 *
-                 * Regra:
-                 * - enquanto ainda houver saldo pendente, o card mostra o restante;
-                 * - quando quitar, o card mantém o último valor pendente mostrado
-                 *   e apenas fica marcado como pago;
-                 * - nunca voltamos ao valor cheio da fatura;
-                 * - nunca removemos o card automaticamente por causa do pagamento.
-                 */
-                if (!faturaExistente) {
-                    // Só cria um novo card se ainda existe algo pendente.
-                    // Se a fatura já estava totalmente paga antes de existir no
-                    // Kanban, não inventamos um lançamento retroativo.
-                    if (restante <= 0.01) return;
+                // Cada pagamento aparece no Kanban na semana em que efetivamente ocorreu.
+                pagamentos.forEach((pagamento, indice) => {
+                    let dia = 0;
+                    if (pagamento.data && /^\d{4}-\d{2}-\d{2}$/.test(pagamento.data)) {
+                        dia = Number(pagamento.data.slice(8, 10));
+                    } else if (pagamento.dataExibicao) {
+                        const partes = String(pagamento.dataExibicao).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                        if (partes) dia = Number(partes[1]);
+                    }
 
-                    faturaExistente = {
-                        id: Date.now() + Math.random(),
-                        desc: nomeItemCard,
-                        valor: restante,
+                    let semanaDestino = -1;
+                    if (dia > 0) {
+                        semanaDestino = data.semanas.findIndex(semana => {
+                            const faixa = String(semana.periodo || '').match(/(\d{1,2})\s*a\s*(\d{1,2})/i);
+                            return faixa && dia >= Number(faixa[1]) && dia <= Number(faixa[2]);
+                        });
+                    }
+                    if (semanaDestino < 0) {
+                        semanaDestino = Math.min(Number(cartao.semanaTeto) || 0, data.semanas.length - 1);
+                    }
+
+                    data.semanas[semanaDestino].itens.push({
+                        id: `pagamento-fatura-${cartao.nome}-${mesAnteriorId}-${pagamento.id ?? indice}`,
+                        desc: `Pagamento fatura ${cartao.nome}${pagamento.dataExibicao ? ` - ${pagamento.dataExibicao}` : ''}`,
+                        valor: Number(pagamento.valor) || 0,
                         tipo: 'saida',
-                        pago: false,
-                        _faturaAutomatica: true,
+                        pago: true,
                         cartaoNome: cartao.nome,
                         faturaMes: mesAnteriorId,
-                        _valorFaturaFixado: restante
-                    };
+                        _pagamentoFaturaGerado: true,
+                        _pagamentoOriginalId: pagamento.id
+                    });
+                });
 
-                    if (data.semanas[semIdxPrevista]) {
-                        data.semanas[semIdxPrevista].itens.push(faturaExistente);
-                    }
-                } else {
-                    // Mantém exatamente a semana para a qual a usuária arrastou a fatura.
-                    faturaExistente.desc = nomeItemCard;
-                    faturaExistente.tipo = 'saida';
-                    faturaExistente._faturaAutomatica = true;
-                    faturaExistente.cartaoNome = cartao.nome;
-                    faturaExistente.faturaMes = mesAnteriorId;
-
-                    if (restante > 0.01) {
-                        // Ainda há algo pendente: atualiza para o valor realmente
-                        // restante e guarda esse valor como o compromisso exibido.
-                        faturaExistente.valor = restante;
-                        faturaExistente._valorFaturaFixado = restante;
-                        faturaExistente.pago = false;
+                // O card agregado representa exclusivamente o saldo ainda não pago.
+                if (restante > 0.01) {
+                    if (!faturaCard) {
+                        const semanaInicial = Math.min(Number(cartao.semanaTeto) || 0, data.semanas.length - 1);
+                        faturaCard = {
+                            id: `fatura-${cartao.nome}-${mesAnteriorId}`,
+                            desc: nomeFatura,
+                            valor: restante,
+                            tipo: 'saida',
+                            pago: false,
+                            _faturaAutomatica: true,
+                            cartaoNome: cartao.nome,
+                            faturaMes: mesAnteriorId
+                        };
+                        data.semanas[semanaInicial].itens.push(faturaCard);
                     } else {
-                        // Quitada: mantém o último valor exibido no Kanban.
-                        // O checkbox mostra que aquele compromisso foi pago, mas
-                        // o valor permanece para não alterar artificialmente o saldo.
-                        const valorFixado = faturaExistente._valorFaturaFixado
-                            ?? faturaExistente.valor
-                            ?? restante;
-                        faturaExistente.valor = valorFixado;
-                        faturaExistente._valorFaturaFixado = valorFixado;
-                        faturaExistente.pago = true;
+                        faturaCard.desc = nomeFatura;
+                        faturaCard.valor = restante;
+                        faturaCard.tipo = 'saida';
+                        faturaCard.pago = false;
+                        faturaCard._faturaAutomatica = true;
+                        faturaCard.cartaoNome = cartao.nome;
+                        faturaCard.faturaMes = mesAnteriorId;
                     }
+                } else if (faturaCard) {
+                    // Quitada: remove o compromisso pendente. Os pagamentos reais
+                    // continuam visíveis individualmente como histórico no Kanban.
+                    data.semanas.forEach(semana => {
+                        semana.itens = (semana.itens || []).filter(item => item !== faturaCard);
+                    });
                 }
             });
         }
-
 
         function calcularTetosDinamicos() {
             const data = dadosApp[mesAtual];
