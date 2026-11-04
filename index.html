@@ -1526,7 +1526,15 @@
                     if (dia > 0) {
                         semanaDestino = data.semanas.findIndex(semana => {
                             const faixa = String(semana.periodo || '').match(/(\d{1,2})\s*a\s*(\d{1,2})/i);
-                            return faixa && dia >= Number(faixa[1]) && dia <= Number(faixa[2]);
+                            if (!faixa) return false;
+
+                            const inicio = Number(faixa[1]);
+                            const fim = Number(faixa[2]);
+
+                            // Faixas que atravessam a virada do mês (ex.: 30/10 a 05/11)
+                            // precisam aceitar dias maiores que o início OU menores que o fim.
+                            if (fim < inicio) return dia >= inicio || dia <= fim;
+                            return dia >= inicio && dia <= fim;
                         });
                     }
                     if (semanaDestino < 0) {
